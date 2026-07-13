@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#f7efd9" />
-  <meta name="description" content="WarmWrite — a tiny, phone-friendly writing app." />
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7efd9">
+  <meta name="description" content="WarmWrite — a tiny, phone-friendly writing app.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
   <title>WarmWrite</title>
 </head>
 <body>
@@ -14,13 +14,13 @@
     <header class="topbar">
       <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
       <div class="doc-meta">
-        <input id="docTitle" aria-label="Document title" value="Untitled" maxlength="80" />
+        <input id="docTitle" aria-label="Document title" value="Untitled" maxlength="80">
         <div id="autosaveStatus" class="subtle">Saved locally</div>
       </div>
       <div class="top-actions">
         <button id="undoBtn" class="icon-btn" aria-label="Undo">↶</button>
         <button id="redoBtn" class="icon-btn" aria-label="Redo">↷</button>
-        <button id="moreBtn" class="icon-btn" aria-label="More options">⋮</button>
+        <button id="moreBtn" class="icon-btn" aria-label="Settings">⋮</button>
       </div>
     </header>
 
@@ -30,7 +30,11 @@
         <button id="closeDrawer" class="icon-btn" aria-label="Close menu">×</button>
       </div>
       <button id="newDocBtn" class="menu-row">New document</button>
-      <label class="menu-row file-row">Open TXT<input id="openTxt" type="file" accept="text/plain,.txt" hidden></label>
+      <label class="menu-row file-row">Open document…<input id="openDocument" type="file" accept="text/plain,.txt,application/rtf,text/rtf,.rtf" hidden></label>
+      <div id="recentSection" class="recent-section">
+        <div class="recent-heading">Recent</div>
+        <div id="recentList"></div>
+      </div>
       <button id="settingsBtn" class="menu-row">Settings</button>
       <button id="aboutBtn" class="menu-row">About</button>
     </aside>
@@ -39,23 +43,20 @@
     <main class="workspace">
       <section id="editorWrap" class="editor-wrap">
         <div id="editor" class="editor" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" data-placeholder="Start writing…"></div>
-
         <div class="statusbar">
-          <span><span id="wordCount">0</span> words</span>
-          <span class="unsaved"><span class="dot"></span><span id="unsavedCount">0</span> unsaved words</span>
+          <button id="statsBtn" class="stats-btn"><span id="wordCount">0</span> words <span id="sessionCount" class="session-count">+0 this session</span></button>
+          <span class="unsaved"><span class="dot"></span><span id="unsavedCount">0</span> unsaved</span>
           <button id="exportBtn" class="export-btn">Export</button>
         </div>
       </section>
 
       <div id="symbolBar" class="symbol-bar" aria-label="Quick symbols"></div>
 
-      <nav class="format-bar" aria-label="Formatting controls">
+      <nav id="formatBar" class="format-bar" aria-label="Formatting controls">
         <button class="format-btn" data-cmd="bold" aria-label="Bold"><strong>B</strong></button>
         <button class="format-btn" data-cmd="italic" aria-label="Italic"><em>I</em></button>
         <button class="format-btn" data-cmd="strikeThrough" aria-label="Strikethrough"><s>S</s></button>
         <span class="divider"></span>
-        <button id="undoBtn2" class="format-btn" aria-label="Undo">↶</button>
-        <button id="redoBtn2" class="format-btn" aria-label="Redo">↷</button>
         <button id="hideKeyboardBtn" class="format-btn keyboard-btn" aria-label="Hide keyboard">⌨</button>
       </nav>
     </main>
@@ -74,6 +75,10 @@
     <form method="dialog">
       <div class="dialog-head"><strong>Settings</strong><button value="cancel" class="icon-btn">×</button></div>
       <label class="setting-row">
+        <span><strong>Formatting bar</strong><small>Show bold, italic and strikethrough while writing.</small></span>
+        <input id="formattingToggle" type="checkbox">
+      </label>
+      <label class="setting-row">
         <span><strong>Save reminder</strong><small>Warm the page as unsaved changes build up.</small></span>
         <input id="reminderToggle" type="checkbox" checked>
       </label>
@@ -87,10 +92,19 @@
         </select>
       </label>
       <label class="setting-block">
-        <span><strong>Quick symbols</strong><small>Edit the buttons shown above the formatting bar.</small></span>
-        <input id="symbolsInput" type="text" value="— “ ” ‘ ’ … ( ) ? ! : ;" />
+        <span><strong>Quick symbols</strong><small>Edit the buttons shown above the keyboard.</small></span>
+        <input id="symbolsInput" type="text" value="— “ ” ‘ ’ … ( ) ? ! : ;">
       </label>
       <button id="resetSettingsBtn" value="cancel" class="danger-row">Reset app data</button>
+    </form>
+  </dialog>
+
+  <dialog id="statsDialog" class="panel-dialog">
+    <form method="dialog">
+      <div class="dialog-head"><strong>Document stats</strong><button value="cancel" class="icon-btn">×</button></div>
+      <div class="stat-row"><span>Words</span><strong id="statsWords">0</strong></div>
+      <div class="stat-row"><span>Characters</span><strong id="statsChars">0</strong></div>
+      <div class="stat-row"><span>This session</span><strong id="statsSession">+0</strong></div>
     </form>
   </dialog>
 
@@ -98,7 +112,7 @@
     <form method="dialog">
       <div class="dialog-head"><strong>About WarmWrite</strong><button value="cancel" class="icon-btn">×</button></div>
       <p>A tiny, phone-friendly writing app. Documents autosave in this browser. Export important work regularly.</p>
-      <p class="subtle">Version 1.0</p>
+      <p class="subtle">Version 1.2</p>
     </form>
   </dialog>
 
