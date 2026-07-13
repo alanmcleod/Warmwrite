@@ -51,3 +51,8 @@ The default name and colours can be changed in `index.html` and `style.css`.
 ## Licence
 
 MIT Licence. See `LICENSE`.
+
+
+## Version 1.1
+
+Mobile formatting, symbol, and status controls now stay docked directly above the on-screen keyboard while typing.

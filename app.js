@@ -203,12 +203,32 @@
     document.getElementById('scrim').hidden = true;
   }
 
+  function syncKeyboardOffset() {
+    const viewport = window.visualViewport;
+    if (!viewport) {
+      document.documentElement.style.setProperty('--keyboard-offset', '0px');
+      return;
+    }
+    const overlap = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+    const editorActive = document.activeElement === editor;
+    document.documentElement.style.setProperty('--keyboard-offset', `${editorActive ? overlap : 0}px`);
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncKeyboardOffset);
+    window.visualViewport.addEventListener('scroll', syncKeyboardOffset);
+  }
+  window.addEventListener('resize', syncKeyboardOffset);
+  editor.addEventListener('focus', () => requestAnimationFrame(syncKeyboardOffset));
+  editor.addEventListener('blur', () => setTimeout(syncKeyboardOffset, 80));
+
   loadDocument();
   reminderToggle.checked = settings.reminder;
   thresholdSelect.value = String(settings.threshold);
   symbolsInput.value = settings.symbols;
   refreshSymbols();
   updateStats();
+  syncKeyboardOffset();
 
   editor.addEventListener('input', () => { updateStats(); queueAutosave(); });
   editor.addEventListener('keyup', rememberSelection);
