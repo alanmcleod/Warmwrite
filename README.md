@@ -11,22 +11,26 @@ Every feature must do one of two things:
 
 If a feature does neither, it doesn't belong in WarmWrite.
 
-WarmWrite is intentionally simple. It is designed for drafting, journalling, note-taking and novel writing without accounts, adverts, subscriptions or unnecessary complexity.
+WarmWrite is intentionally simple. It is designed for drafting, journalling,
+note-taking and novel writing without accounts, adverts, subscriptions or
+unnecessary complexity.
 
 Your documents remain on your device unless you choose to export them.
 
-## In three words
-
-**Open. Write. Save.**
+## Open. Write. Save.
 
 WarmWrite isn't trying to replace Microsoft Word.
 
-It is designed for the moment when an idea arrives and you simply want to start writing.
+It is designed for the moment when an idea arrives and you simply want to
+start writing.
 
-## Add to your phone
+## Version 1.5
 
-### iPhone / iPad (Safari)
-Open WarmWrite in Safari → Share → **Add to Home Screen** → leave **Open as Web App** enabled → **Add**.
-
-### Android (Chrome)
-Open WarmWrite in Chrome → ⋮ → **Add to Home screen** or **Install app**.
+- Optional Quick Symbols bar
+- Optional Bold / Italic / Strikethrough bar
+- Both bars can be hidden to enlarge the writing area
+- Check for updates from Settings
+- Automatic update checks can be turned on or off
+- Update prompt offers **Update now** or **Later — update from Settings**
+- Current and latest version shown in Settings
+- Original WarmWrite icon retained

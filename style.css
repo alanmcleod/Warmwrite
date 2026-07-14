@@ -171,3 +171,43 @@ body.formatting-on .symbol-bar {
     right: 0;
   }
 }
+
+
+/* WarmWrite 1.5 optional lower bars */
+.symbol-bar { display: none; }
+body.symbols-on .symbol-bar { display: flex; }
+
+.editor {
+  padding-bottom: calc(var(--status-height) + 34px);
+  scroll-padding-bottom: calc(var(--status-height) + 34px);
+}
+body.symbols-on .editor {
+  padding-bottom: calc(var(--status-height) + var(--symbol-height) + 34px);
+  scroll-padding-bottom: calc(var(--status-height) + var(--symbol-height) + 34px);
+}
+body.formatting-on .editor {
+  padding-bottom: calc(var(--status-height) + var(--format-height) + 34px);
+  scroll-padding-bottom: calc(var(--status-height) + var(--format-height) + 34px);
+}
+body.symbols-on.formatting-on .editor {
+  padding-bottom: calc(var(--status-height) + var(--symbol-height) + var(--format-height) + 34px);
+  scroll-padding-bottom: calc(var(--status-height) + var(--symbol-height) + var(--format-height) + 34px);
+}
+
+.statusbar { bottom: 8px; }
+body.symbols-on .statusbar { bottom: calc(var(--symbol-height) + 8px); }
+body.formatting-on .statusbar { bottom: calc(var(--format-height) + 8px); }
+body.symbols-on.formatting-on .statusbar {
+  bottom: calc(var(--symbol-height) + var(--format-height) + 8px);
+}
+
+.symbol-bar { bottom: 0; }
+body.symbols-on.formatting-on .symbol-bar { bottom: var(--format-height); }
+
+.updates-section {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.updates-section h3 {
+  margin: 14px 0 4px;
+}

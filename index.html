@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#f7efd9">
   <meta name="description" content="WarmWrite — a tiny, phone-friendly writing app.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css">
-  <title>WarmWrite</title>
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icons/favicon.png">
+  <link rel="stylesheet" href="style.css">
+  <title>WarmWrite</title>
 </head>
 <body>
   <div class="app-shell">
@@ -93,10 +93,25 @@
           <option value="1000">1,000 words</option>
         </select>
       </label>
-      <label class="setting-block">
+      <label class="setting-row">
+        <span><strong>Quick symbols bar</strong><small>Show quick-insert symbols above the keyboard.</small></span>
+        <input id="symbolsToggle" type="checkbox" checked>
+      </label>
+      <label id="symbolsEditorRow" class="setting-block">
         <span><strong>Quick symbols</strong><small>Edit the buttons shown above the keyboard.</small></span>
         <input id="symbolsInput" type="text" value="— “ ” ‘ ’ … ( ) ? ! : ;">
       </label>
+      <section class="updates-section">
+        <h3>Updates</h3>
+        <div class="stat-row"><span>Current version</span><strong id="currentVersionText">1.5</strong></div>
+        <div class="stat-row"><span>Latest version</span><strong id="latestVersionText">Not checked</strong></div>
+        <label class="setting-row">
+          <span><strong>Automatically check</strong><small>Check for a newer version when WarmWrite opens.</small></span>
+          <input id="autoUpdateToggle" type="checkbox" checked>
+        </label>
+        <button id="checkUpdatesBtn" value="cancel" class="primary-row">Check for updates</button>
+        <button id="settingsUpdateBtn" value="cancel" class="primary-row" hidden>Update now</button>
+      </section>
       <button id="resetSettingsBtn" value="cancel" class="danger-row">Reset app data</button>
     </form>
   </dialog>
@@ -110,11 +125,28 @@
     </form>
   </dialog>
 
+  <dialog id="updateDialog" class="panel-dialog">
+    <form method="dialog">
+      <div class="dialog-head"><strong>WarmWrite update available</strong><button id="closeUpdateBtn" value="cancel" class="icon-btn" aria-label="Close">×</button></div>
+      <p id="updateMessage">A newer version of WarmWrite is available.</p>
+      <button id="updateNowBtn" value="cancel" class="primary-row">Update now</button>
+      <button id="laterSettingsBtn" value="cancel" class="menu-row">Later — update from Settings</button>
+    </form>
+  </dialog>
+
+  <dialog id="updatedDialog" class="panel-dialog">
+    <form method="dialog">
+      <div class="dialog-head"><strong>WarmWrite updated</strong><button value="cancel" class="icon-btn">×</button></div>
+      <p id="updatedMessage">WarmWrite has been updated.</p>
+      <button value="cancel" class="primary-row">OK</button>
+    </form>
+  </dialog>
+
   <dialog id="aboutDialog" class="panel-dialog">
     <form method="dialog">
       <div class="dialog-head"><strong>About WarmWrite</strong><button value="cancel" class="icon-btn">×</button></div>
       <p>A tiny, phone-friendly writing app. Documents autosave in this browser. Export important work regularly.</p>
-      <p class="subtle">Version 1.4</p>
+      <p class="subtle">Version 1.5</p>
     </form>
   </dialog>
 

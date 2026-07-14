@@ -5,6 +5,9 @@ const OLD_DOC_KEY = 'warmwrite.document.v1';
 const DOCS_KEY = 'warmwrite.documents.v2';
 const CURRENT_KEY = 'warmwrite.current.v2';
 const SETTINGS_KEY = 'warmwrite.settings.v1';
+const APP_VERSION = '1.5';
+const VERSION_URL = './version.json';
+const LAST_VERSION_KEY = 'warmwrite.lastVersionSeen';
 const BASE_COLOR = [255,250,240], WARM_COLOR = [255,173,77], HOT_COLOR = [244,97,37];
 
 const $ = id => document.getElementById(id);
@@ -12,6 +15,7 @@ const editor = $('editor'), editorWrap = $('editorWrap'), docTitle = $('docTitle
 const wordCount = $('wordCount'), sessionCount = $('sessionCount'), unsavedCount = $('unsavedCount');
 const autosaveStatus = $('autosaveStatus'), symbolBar = $('symbolBar');
 const reminderToggle = $('reminderToggle'), formattingToggle = $('formattingToggle');
+const symbolsToggle = $('symbolsToggle'), autoUpdateToggle = $('autoUpdateToggle');
 const thresholdSelect = $('thresholdSelect'), symbolsInput = $('symbolsInput');
 
 let settings = loadSettings();
@@ -22,6 +26,7 @@ let baselineWords = 0;
 let sessionStartWords = 0;
 let saveTimer = null;
 let savedRange = null;
+let availableVersion = null;
 
 function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2,9)}`; }
 function countWords(text) { const clean = text.trim(); return clean ? clean.split(/\s+/u).length : 0; }
@@ -29,7 +34,7 @@ function textNow() { return editor.innerText.replace(/\u00a0/g,' '); }
 function titleNow() { return docTitle.value.trim() || 'Untitled'; }
 
 function loadSettings() {
-  const defaults = { reminder:true, threshold:300, symbols:'— “ ” ‘ ’ … ( ) ? ! : ;', formatting:false };
+  const defaults = { reminder:true, threshold:300, symbols:'— “ ” ‘ ’ … ( ) ? ! : ;', formatting:false, symbolsBar:true, autoUpdate:true };
   try { return {...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')}; }
   catch { return defaults; }
 }
@@ -114,6 +119,64 @@ function showStats() {
   $('statsDialog').showModal();
 }
 
+function applyBarVisibility() {
+  document.body.classList.toggle('formatting-on', settings.formatting);
+  document.body.classList.toggle('symbols-on', settings.symbolsBar);
+  formattingToggle.checked = settings.formatting;
+  symbolsToggle.checked = settings.symbolsBar;
+  $('symbolsEditorRow').hidden = !settings.symbolsBar;
+}
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  const length = Math.max(pa.length, pb.length);
+  for (let i = 0; i < length; i++) {
+    const av = pa[i] || 0, bv = pb[i] || 0;
+    if (av > bv) return 1;
+    if (av < bv) return -1;
+  }
+  return 0;
+}
+async function checkForUpdates(showResult=false) {
+  $('latestVersionText').textContent = 'Checking…';
+  try {
+    const response = await fetch(`${VERSION_URL}?t=${Date.now()}`, {cache:'no-store'});
+    if (!response.ok) throw new Error('Version check failed');
+    const data = await response.json();
+    availableVersion = data.version || APP_VERSION;
+    $('latestVersionText').textContent = availableVersion;
+    const newer = compareVersions(availableVersion, APP_VERSION) > 0;
+    $('settingsUpdateBtn').hidden = !newer;
+    if (newer) {
+      $('updateMessage').textContent = `WarmWrite ${availableVersion} is available. You can update now or continue writing and update later from Settings.`;
+      $('updateDialog').showModal();
+    } else if (showResult) {
+      alert(`WarmWrite ${APP_VERSION} is up to date.`);
+    }
+  } catch {
+    $('latestVersionText').textContent = 'Unable to check';
+    if (showResult) alert('WarmWrite could not check for updates just now.');
+  }
+}
+async function installUpdate() {
+  saveDocument();
+  autosaveStatus.textContent = 'Updating…';
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration => registration.update()));
+    }
+  } catch {}
+  localStorage.setItem(LAST_VERSION_KEY, availableVersion || APP_VERSION);
+  location.reload();
+}
+function showUpdatedMessageIfNeeded() {
+  const previous = localStorage.getItem(LAST_VERSION_KEY);
+  if (previous && previous === APP_VERSION) {
+    localStorage.removeItem(LAST_VERSION_KEY);
+    $('updatedMessage').textContent = `WarmWrite has been updated to version ${APP_VERSION}.`;
+    setTimeout(() => $('updatedDialog').showModal(), 350);
+  }
+}
 function refreshSymbols() {
   symbolBar.innerHTML = '';
   settings.symbols.trim().split(/\s+/u).filter(Boolean).forEach(symbol => {
@@ -124,10 +187,7 @@ function refreshSymbols() {
     symbolBar.appendChild(btn);
   });
 }
-function applyFormattingVisibility() {
-  document.body.classList.toggle('formatting-on', settings.formatting);
-  formattingToggle.checked = settings.formatting;
-}
+function applyFormattingVisibility() { applyBarVisibility(); }
 function rememberSelection() {
   const selection = window.getSelection();
   if (selection && selection.rangeCount && editor.contains(selection.anchorNode)) savedRange = selection.getRangeAt(0).cloneRange();
@@ -361,8 +421,12 @@ editor.addEventListener('focus', () => requestAnimationFrame(syncKeyboardFrame))
 editor.addEventListener('blur', () => setTimeout(syncKeyboardFrame, 80));
 
 reminderToggle.checked=settings.reminder; formattingToggle.checked=settings.formatting;
+symbolsToggle.checked=settings.symbolsBar; autoUpdateToggle.checked=settings.autoUpdate;
 thresholdSelect.value=String(settings.threshold); symbolsInput.value=settings.symbols;
-refreshSymbols(); applyFormattingVisibility(); loadCurrentDocument(); syncKeyboardFrame();
+$('currentVersionText').textContent=APP_VERSION;
+refreshSymbols(); applyBarVisibility(); loadCurrentDocument(); syncKeyboardFrame();
+showUpdatedMessageIfNeeded();
+if (settings.autoUpdate) setTimeout(() => checkForUpdates(false), 900);
 
 editor.addEventListener('input',()=>{ updateStats(); queueAutosave(); });
 editor.addEventListener('keyup',rememberSelection); editor.addEventListener('mouseup',rememberSelection); editor.addEventListener('touchend',rememberSelection);
@@ -418,10 +482,18 @@ $('openDocument').addEventListener('change',async event=>{
   event.target.value='';
 });
 
-formattingToggle.addEventListener('change',()=>{ settings.formatting=formattingToggle.checked; saveSettings(); applyFormattingVisibility(); });
+formattingToggle.addEventListener('change',()=>{ settings.formatting=formattingToggle.checked; saveSettings(); applyBarVisibility(); });
+symbolsToggle.addEventListener('change',()=>{ settings.symbolsBar=symbolsToggle.checked; saveSettings(); applyBarVisibility(); });
+autoUpdateToggle.addEventListener('change',()=>{ settings.autoUpdate=autoUpdateToggle.checked; saveSettings(); });
 reminderToggle.addEventListener('change',()=>{ settings.reminder=reminderToggle.checked; saveSettings(); updateStats(); });
 thresholdSelect.addEventListener('change',()=>{ settings.threshold=Number(thresholdSelect.value); saveSettings(); updateStats(); });
 symbolsInput.addEventListener('change',()=>{ settings.symbols=symbolsInput.value || '— “ ” ‘ ’ … ( ) ? ! : ;'; saveSettings(); refreshSymbols(); });
+
+$('checkUpdatesBtn').addEventListener('click', e => { e.preventDefault(); checkForUpdates(true); });
+$('settingsUpdateBtn').addEventListener('click', e => { e.preventDefault(); installUpdate(); });
+$('updateNowBtn').addEventListener('click', e => { e.preventDefault(); installUpdate(); });
+$('laterSettingsBtn').addEventListener('click', e => { e.preventDefault(); $('updateDialog').close(); });
+$('closeUpdateBtn').addEventListener('click', () => $('updateDialog').close());
 
 $('resetSettingsBtn').addEventListener('click',e=>{
   e.preventDefault();
