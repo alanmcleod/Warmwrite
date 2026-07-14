@@ -1,30 +1,32 @@
-# WarmWrite 1.4
+# WarmWrite
 
-A lightweight, mobile-first browser word processor for distraction-free drafting.
+**A fast, distraction-free writing app designed primarily for phones.**
 
-## Version 1.4
-- Open TXT and simple RTF documents
-- Last three recent local documents in the menu
-- Rename by tapping the document title
-- Session word count
-- Formatting bar toggle in Settings (off by default)
-- Mobile symbol/formatting dock stays above the keyboard
-- Local autosave, save reminder, TXT and RTF export
+WarmWrite exists to make writing **easy** and **safe**.
 
-Important: local documents live in browser storage. Export important work regularly.
+Every feature must do one of two things:
 
-## GitHub Pages
-Upload all eight files to the repository root and commit to `main`. GitHub Pages will rebuild automatically.
+- **Help you write.**
+- **Protect your writing.**
 
-## Licence
-MIT
+If a feature does neither, it doesn't belong in WarmWrite.
 
-- Improved bold and italic toggling on iPhone/Safari.
+WarmWrite is intentionally simple. It is designed for drafting, journalling, note-taking and novel writing without accounts, adverts, subscriptions or unnecessary complexity.
 
-- B/I/S inspect the full selected text formatting state before explicitly toggling it.
-- Improved iPhone/Safari selection preservation and a single verified retry if Safari ignores the first command.
+Your documents remain on your device unless you choose to export them.
 
-- Locks the title bar in the app frame.
-- Locks the enabled status, symbol and formatting bars together above the keyboard.
-- Only the document text scrolls while writing.
-- Removes toolbar transition movement during iPhone viewport changes.
+## In three words
+
+**Open. Write. Save.**
+
+WarmWrite isn't trying to replace Microsoft Word.
+
+It is designed for the moment when an idea arrives and you simply want to start writing.
+
+## Add to your phone
+
+### iPhone / iPad (Safari)
+Open WarmWrite in Safari → Share → **Add to Home Screen** → leave **Open as Web App** enabled → **Add**.
+
+### Android (Chrome)
+Open WarmWrite in Chrome → ⋮ → **Add to Home screen** or **Install app**.
