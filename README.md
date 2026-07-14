@@ -1,8 +1,8 @@
-# WarmWrite 1.2
+# WarmWrite 1.4
 
 A lightweight, mobile-first browser word processor for distraction-free drafting.
 
-## Version 1.2
+## Version 1.4
 - Open TXT and simple RTF documents
 - Last three recent local documents in the menu
 - Rename by tapping the document title
@@ -18,3 +18,13 @@ Upload all eight files to the repository root and commit to `main`. GitHub Pages
 
 ## Licence
 MIT
+
+- Improved bold and italic toggling on iPhone/Safari.
+
+- B/I/S inspect the full selected text formatting state before explicitly toggling it.
+- Improved iPhone/Safari selection preservation and a single verified retry if Safari ignores the first command.
+
+- Locks the title bar in the app frame.
+- Locks the enabled status, symbol and formatting bars together above the keyboard.
+- Only the document text scrolls while writing.
+- Removes toolbar transition movement during iPhone viewport changes.

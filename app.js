@@ -147,8 +147,83 @@ function insertAtCaret(text) {
   }
   editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));
 }
+function formattingStateForNode(node, cmd) {
+  const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  if (!element || !editor.contains(element)) return false;
+  const style = getComputedStyle(element);
+
+  if (cmd === 'bold') {
+    const weight = Number.parseInt(style.fontWeight, 10);
+    return Number.isFinite(weight) ? weight >= 600 : ['bold', 'bolder'].includes(style.fontWeight);
+  }
+  if (cmd === 'italic') return style.fontStyle === 'italic';
+  if (cmd === 'strikeThrough') return style.textDecorationLine.split(/\s+/).includes('line-through');
+  return false;
+}
+function selectedTextNodes(range) {
+  const nodes = [];
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      try { return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; }
+      catch { return NodeFilter.FILTER_REJECT; }
+    }
+  });
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  return nodes;
+}
+function selectedFormattingState(cmd, range) {
+  if (range.collapsed) return formattingStateForNode(range.startContainer, cmd);
+  const nodes = selectedTextNodes(range);
+  return nodes.length > 0 && nodes.every(node => formattingStateForNode(node, cmd));
+}
+function commandState(cmd) {
+  try { return document.queryCommandState(cmd); }
+  catch { return false; }
+}
+function toggleSelectedInline(cmd) {
+  editor.focus();
+  restoreSelection();
+
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) return;
+
+  const range = selection.getRangeAt(0).cloneRange();
+  const wasOn = selectedFormattingState(cmd, range);
+  const targetOn = !wasOn;
+
+  // Safari sometimes changes the selection when a toolbar control is touched.
+  // Put the saved range back immediately before issuing the edit command.
+  selection.removeAllRanges();
+  selection.addRange(range);
+  savedRange = range.cloneRange();
+
+  document.execCommand(cmd, false);
+
+  // Verify the result. If Safari ignored the first toggle, restore the same
+  // selection and retry once only when the command state still disagrees.
+  const afterFirst = commandState(cmd);
+  if (afterFirst !== targetOn) {
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand(cmd, false);
+  }
+
+  rememberSelection();
+  updateStats();
+  queueAutosave();
+}
 function applyCommand(cmd) {
-  editor.focus(); restoreSelection(); document.execCommand(cmd,false); rememberSelection(); updateStats(); queueAutosave();
+  if (['bold','italic','strikeThrough'].includes(cmd)) {
+    toggleSelectedInline(cmd);
+    return;
+  }
+  editor.focus();
+  restoreSelection();
+  document.execCommand(cmd, false);
+  rememberSelection();
+  updateStats();
+  queueAutosave();
 }
 function safeName(ext) {
   const base = titleNow().replace(/[\\/:*?"<>|]+/g,'-').slice(0,80);
@@ -173,6 +248,8 @@ function nodeToRtf(node) {
   if (node.nodeType !== Node.ELEMENT_NODE) return '';
   const tag = node.tagName.toLowerCase(), inner = Array.from(node.childNodes).map(nodeToRtf).join('');
   if (tag === 'br') return '\\line ';
+  if (tag === 'span' && node.dataset.wwFormat === 'bold') return node.dataset.wwState === 'off' ? `{\\b0 ${inner}}` : `{\\b ${inner}}`;
+  if (tag === 'span' && node.dataset.wwFormat === 'italic') return node.dataset.wwState === 'off' ? `{\\i0 ${inner}}` : `{\\i ${inner}}`;
   if (tag === 'b' || tag === 'strong') return `{\\b ${inner}}`;
   if (tag === 'i' || tag === 'em') return `{\\i ${inner}}`;
   if (tag === 's' || tag === 'strike' || tag === 'del') return `{\\strike ${inner}}`;
@@ -255,31 +332,53 @@ function switchDocument(id) {
 function openDrawer() { $('drawer').classList.add('open'); $('drawer').setAttribute('aria-hidden','false'); $('scrim').hidden=false; renderRecents(); }
 function closeDrawer() { $('drawer').classList.remove('open'); $('drawer').setAttribute('aria-hidden','true'); $('scrim').hidden=true; }
 
-function syncKeyboardOffset() {
-  const viewport=window.visualViewport;
-  if (!viewport) { document.documentElement.style.setProperty('--keyboard-offset','0px'); return; }
-  const overlap=Math.max(0,window.innerHeight-viewport.height-viewport.offsetTop);
-  document.documentElement.style.setProperty('--keyboard-offset',`${document.activeElement===editor ? overlap : 0}px`);
+function syncKeyboardFrame() {
+  const viewport = window.visualViewport;
+  const topbarHeight = document.querySelector('.topbar')?.getBoundingClientRect().height || 72;
+
+  if (!viewport) {
+    document.body.classList.remove('keyboard-open');
+    document.documentElement.style.removeProperty('--visual-workspace-height');
+    return;
+  }
+
+  const keyboardOpen = document.activeElement === editor && viewport.height < window.innerHeight - 80;
+  document.body.classList.toggle('keyboard-open', keyboardOpen);
+
+  if (keyboardOpen) {
+    const workspaceHeight = Math.max(180, viewport.height - topbarHeight);
+    document.documentElement.style.setProperty('--visual-workspace-height', `${workspaceHeight}px`);
+  } else {
+    document.documentElement.style.removeProperty('--visual-workspace-height');
+  }
 }
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize',syncKeyboardOffset);
-  window.visualViewport.addEventListener('scroll',syncKeyboardOffset);
+  window.visualViewport.addEventListener('resize', syncKeyboardFrame);
+  window.visualViewport.addEventListener('scroll', syncKeyboardFrame);
 }
-window.addEventListener('resize',syncKeyboardOffset);
-editor.addEventListener('focus',()=>requestAnimationFrame(syncKeyboardOffset));
-editor.addEventListener('blur',()=>setTimeout(syncKeyboardOffset,80));
+window.addEventListener('resize', syncKeyboardFrame);
+editor.addEventListener('focus', () => requestAnimationFrame(syncKeyboardFrame));
+editor.addEventListener('blur', () => setTimeout(syncKeyboardFrame, 80));
 
 reminderToggle.checked=settings.reminder; formattingToggle.checked=settings.formatting;
 thresholdSelect.value=String(settings.threshold); symbolsInput.value=settings.symbols;
-refreshSymbols(); applyFormattingVisibility(); loadCurrentDocument(); syncKeyboardOffset();
+refreshSymbols(); applyFormattingVisibility(); loadCurrentDocument(); syncKeyboardFrame();
 
 editor.addEventListener('input',()=>{ updateStats(); queueAutosave(); });
 editor.addEventListener('keyup',rememberSelection); editor.addEventListener('mouseup',rememberSelection); editor.addEventListener('touchend',rememberSelection);
 docTitle.addEventListener('input',()=>{ currentDoc.title=titleNow(); currentDoc.updatedAt=Date.now(); renderRecents(); queueAutosave(); });
 
 document.querySelectorAll('[data-cmd]').forEach(btn => {
-  btn.addEventListener('pointerdown',e=>e.preventDefault());
+  btn.addEventListener('pointerdown', e => {
+    rememberSelection();
+    e.preventDefault();
+  });
+  btn.addEventListener('touchstart', () => rememberSelection(), {passive:true});
   btn.addEventListener('click',()=>applyCommand(btn.dataset.cmd));
+});
+document.addEventListener('selectionchange', () => {
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount && editor.contains(selection.anchorNode)) rememberSelection();
 });
 $('undoBtn').addEventListener('click',()=>applyCommand('undo'));
 $('redoBtn').addEventListener('click',()=>applyCommand('redo'));

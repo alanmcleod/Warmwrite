@@ -67,3 +67,107 @@ body.formatting-on .format-bar { display: flex; }
   .symbol-bar { padding-inline: 24px; }
   .format-bar { gap: 6px; padding-inline: 24px; }
 }
+
+.editor span[data-ww-format="bold"][data-ww-state="on"] { font-weight: 700 !important; }
+.editor span[data-ww-format="bold"][data-ww-state="off"] { font-weight: 400 !important; }
+.editor span[data-ww-format="italic"][data-ww-state="on"] { font-style: italic !important; }
+.editor span[data-ww-format="italic"][data-ww-state="off"] { font-style: normal !important; }
+
+
+/* WarmWrite 1.4: rigid writing frame.
+   The app shell does not page-scroll; only the editor scrolls. */
+html, body {
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+}
+.app-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.topbar {
+  position: relative;
+  top: auto;
+  flex: 0 0 72px;
+  z-index: 20;
+}
+.workspace {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+.editor-wrap {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.editor {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: calc(var(--status-height) + var(--symbol-height) + 34px);
+  scroll-padding-bottom: calc(var(--status-height) + var(--symbol-height) + 34px);
+}
+body.formatting-on .editor {
+  padding-bottom: calc(var(--status-height) + var(--symbol-height) + var(--format-height) + 34px);
+  scroll-padding-bottom: calc(var(--status-height) + var(--symbol-height) + var(--format-height) + 34px);
+}
+.statusbar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--symbol-height) + 8px);
+  transition: none;
+  transform: translateZ(0);
+  will-change: auto;
+}
+body.formatting-on .statusbar {
+  bottom: calc(var(--format-height) + var(--symbol-height) + 8px);
+}
+.symbol-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: none;
+  transform: translateZ(0);
+  will-change: auto;
+}
+body.formatting-on .symbol-bar {
+  bottom: var(--format-height);
+}
+.format-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: none;
+  transform: translateZ(0);
+  will-change: auto;
+}
+.keyboard-open .workspace {
+  height: var(--visual-workspace-height, auto);
+}
+@media (min-width:760px) {
+  .statusbar {
+    left: 24px;
+    right: 24px;
+  }
+  .symbol-bar, .format-bar {
+    left: 0;
+    right: 0;
+  }
+}
