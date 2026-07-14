@@ -1,9 +1,9 @@
 {
-  "version": "1.5.2",
+  "version": "1.6",
   "notes": [
-    "Stops repeated update prompts after updating",
-    "Remembers Later or close for the offered version",
-    "More reliable service-worker activation on iPhone",
-    "Stable dock remains above the keyboard"
+    "Update checks occur automatically at most once per day",
+    "Dismissed updates remain available in Settings without repeated prompts",
+    "Single controlled reload after an update",
+    "Calm rigid toolbar dock for extended testing"
   ]
 }

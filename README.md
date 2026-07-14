@@ -24,7 +24,7 @@ WarmWrite isn't trying to replace Microsoft Word.
 It is designed for the moment when an idea arrives and you simply want to
 start writing.
 
-## Version 1.5.2
+## Version 1.6
 
 - Optional Quick Symbols bar
 - Optional Bold / Italic / Strikethrough bar
@@ -43,3 +43,15 @@ start writing.
 - Remembers when an offered update is dismissed for later.
 - Forces Safari to request the newly installed app shell after an update.
 - Note: the iPhone keyboard navigation strip (up/down arrows and tick) is native iOS interface and cannot reliably be hidden by a website.
+
+## Testing release
+
+Version 1.6 deliberately adds no new writing features. It is intended for
+extended real-world testing.
+
+- Automatic update checks occur no more than once per day.
+- Choosing Later or closing an update notice suppresses repeat prompts for that version.
+- Updates remain available from Settings.
+- The lower WarmWrite controls remain a rigid, non-animated dock.
+- The iPhone up/down/tick keyboard strip is native iOS interface and cannot
+  reliably be removed by a web app.

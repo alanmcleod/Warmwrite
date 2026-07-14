@@ -5,10 +5,12 @@ const OLD_DOC_KEY = 'warmwrite.document.v1';
 const DOCS_KEY = 'warmwrite.documents.v2';
 const CURRENT_KEY = 'warmwrite.current.v2';
 const SETTINGS_KEY = 'warmwrite.settings.v1';
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.6';
 const VERSION_URL = './version.json';
 const LAST_VERSION_KEY = 'warmwrite.lastVersionSeen';
 const DISMISSED_UPDATE_KEY = 'warmwrite.dismissedUpdate';
+const UPDATE_CHECKED_AT_KEY = 'warmwrite.updateCheckedAt';
+const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 const BASE_COLOR = [255,250,240], WARM_COLOR = [255,173,77], HOT_COLOR = [244,97,37];
 
 const $ = id => document.getElementById(id);
@@ -137,37 +139,45 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-async function checkForUpdates(showResult=false) {
+async function checkForUpdates(manual = false) {
+  const now = Date.now();
+  const lastChecked = Number(localStorage.getItem(UPDATE_CHECKED_AT_KEY) || 0);
+
+  // Automatic checks happen at most once in 24 hours. Manual checks always run.
+  if (!manual && now - lastChecked < UPDATE_CHECK_INTERVAL) return;
+
   $('latestVersionText').textContent = 'Checking…';
+
   try {
-    const response = await fetch(`${VERSION_URL}?t=${Date.now()}`, {cache:'no-store'});
+    const response = await fetch(`${VERSION_URL}?t=${now}`, {cache:'no-store'});
     if (!response.ok) throw new Error('Version check failed');
 
     const data = await response.json();
     availableVersion = String(data.version || APP_VERSION).trim();
+    localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(now));
     $('latestVersionText').textContent = availableVersion;
 
     const newer = compareVersions(availableVersion, APP_VERSION) > 0;
     $('settingsUpdateBtn').hidden = !newer;
 
-    // A completed update must never trigger another prompt for the same version.
     if (!newer) {
       localStorage.removeItem(DISMISSED_UPDATE_KEY);
-      if (showResult) alert(`WarmWrite ${APP_VERSION} is up to date.`);
+      if (manual) alert(`WarmWrite ${APP_VERSION} is up to date.`);
       return;
     }
 
+    // Closing or choosing Later suppresses automatic reminders for this exact
+    // offered version. It remains available in Settings at any time.
     const dismissedVersion = localStorage.getItem(DISMISSED_UPDATE_KEY);
-    const shouldPrompt = showResult || dismissedVersion !== availableVersion;
+    if (!manual && dismissedVersion === availableVersion) return;
 
-    if (shouldPrompt) {
-      $('updateMessage').textContent =
-        `WarmWrite ${availableVersion} is available. You can update now or continue writing and update later from Settings.`;
-      if (!$('updateDialog').open) $('updateDialog').showModal();
-    }
+    $('updateMessage').textContent =
+      `WarmWrite ${availableVersion} is available. Update now, or continue writing and update later from Settings.`;
+
+    if (!$('updateDialog').open) $('updateDialog').showModal();
   } catch {
     $('latestVersionText').textContent = 'Unable to check';
-    if (showResult) alert('WarmWrite could not check for updates just now.');
+    if (manual) alert('WarmWrite could not check for updates just now.');
   }
 }
 async function installUpdate() {
@@ -177,25 +187,49 @@ async function installUpdate() {
   const targetVersion = availableVersion || APP_VERSION;
   localStorage.setItem(LAST_VERSION_KEY, targetVersion);
   localStorage.removeItem(DISMISSED_UPDATE_KEY);
+  localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(Date.now()));
+
+  let reloaded = false;
+  const reloadOnce = () => {
+    if (reloaded) return;
+    reloaded = true;
+    const url = new URL(location.href);
+    url.searchParams.set('wwv', targetVersion);
+    location.replace(url.toString());
+  };
+
+  if (!('serviceWorker' in navigator)) {
+    reloadOnce();
+    return;
+  }
+
+  navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, {once:true});
 
   try {
-    if ('serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (registration) {
-        await registration.update();
-
-        // When a waiting worker exists, activate it now.
-        if (registration.waiting) {
-          registration.waiting.postMessage({type:'SKIP_WAITING'});
-        }
-      }
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      reloadOnce();
+      return;
     }
-  } catch {}
 
-  // Cache-busting query prevents Safari from immediately reopening the old shell.
-  const url = new URL(location.href);
-  url.searchParams.set('wwv', targetVersion);
-  location.replace(url.toString());
+    await registration.update();
+
+    if (registration.waiting) {
+      registration.waiting.postMessage({type:'SKIP_WAITING'});
+    } else if (registration.installing) {
+      registration.installing.addEventListener('statechange', () => {
+        if (registration.waiting) registration.waiting.postMessage({type:'SKIP_WAITING'});
+      });
+    } else {
+      // The newest worker may already control this page.
+      setTimeout(reloadOnce, 450);
+    }
+  } catch {
+    reloadOnce();
+  }
+
+  // Fallback in case iOS does not emit controllerchange.
+  setTimeout(reloadOnce, 1800);
 }
 function showUpdatedMessageIfNeeded() {
   const previous = localStorage.getItem(LAST_VERSION_KEY);
@@ -560,11 +594,17 @@ $('settingsUpdateBtn').addEventListener('click', e => { e.preventDefault(); inst
 $('updateNowBtn').addEventListener('click', e => { e.preventDefault(); installUpdate(); });
 $('laterSettingsBtn').addEventListener('click', e => {
   e.preventDefault();
-  if (availableVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
+  if (availableVersion) {
+    localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
+    localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(Date.now()));
+  }
   $('updateDialog').close();
 });
 $('closeUpdateBtn').addEventListener('click', () => {
-  if (availableVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
+  if (availableVersion) {
+    localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
+    localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(Date.now()));
+  }
   $('updateDialog').close();
 });
 

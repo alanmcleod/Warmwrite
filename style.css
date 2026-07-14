@@ -301,3 +301,37 @@ body {
     --ww-visible-height: 100svh;
   }
 }
+
+
+/* WarmWrite 1.6 testing release: calm, rigid keyboard dock */
+.statusbar,
+.symbol-bar,
+.format-bar {
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+.workspace {
+  contain: layout paint size;
+}
+
+.editor {
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+}
+
+/* Keep the dock visually quiet and clearly separate from the document. */
+.statusbar,
+.symbol-bar,
+.format-bar {
+  background: rgba(255, 252, 246, 0.985);
+}
+
+.symbol-bar,
+.format-bar {
+  border-top: 1px solid var(--line);
+}
+
+/* iOS may add its own keyboard navigation strip below this dock.
+   That native strip cannot be hidden reliably by a web application. */
