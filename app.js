@@ -392,39 +392,77 @@ function switchDocument(id) {
 function openDrawer() { $('drawer').classList.add('open'); $('drawer').setAttribute('aria-hidden','false'); $('scrim').hidden=false; renderRecents(); }
 function closeDrawer() { $('drawer').classList.remove('open'); $('drawer').setAttribute('aria-hidden','true'); $('scrim').hidden=true; }
 
-function syncKeyboardFrame() {
+let lastVisibleHeight = 0;
+let viewportFrame = 0;
+let settleTimer = 0;
+
+function measureVisibleHeight() {
   const viewport = window.visualViewport;
-  const topbarHeight = document.querySelector('.topbar')?.getBoundingClientRect().height || 72;
+  const measured = viewport ? viewport.height : window.innerHeight;
+  return Math.max(320, Math.round(measured));
+}
 
-  if (!viewport) {
-    document.body.classList.remove('keyboard-open');
-    document.documentElement.style.removeProperty('--visual-workspace-height');
-    return;
-  }
+function applyVisibleHeight(force = false) {
+  viewportFrame = 0;
+  const nextHeight = measureVisibleHeight();
 
-  const keyboardOpen = document.activeElement === editor && viewport.height < window.innerHeight - 80;
+  // Ignore the one- or two-pixel fluctuations iOS emits while the caret and
+  // selection handles are changing. Those tiny updates caused the old dock to
+  // appear to bob.
+  if (!force && Math.abs(nextHeight - lastVisibleHeight) < 4) return;
+
+  lastVisibleHeight = nextHeight;
+  document.documentElement.style.setProperty('--ww-visible-height', `${nextHeight}px`);
+
+  const keyboardOpen =
+    document.activeElement === editor &&
+    nextHeight < Math.round(window.screen.height * 0.82);
+
   document.body.classList.toggle('keyboard-open', keyboardOpen);
+}
 
-  if (keyboardOpen) {
-    const workspaceHeight = Math.max(180, viewport.height - topbarHeight);
-    document.documentElement.style.setProperty('--visual-workspace-height', `${workspaceHeight}px`);
-  } else {
-    document.documentElement.style.removeProperty('--visual-workspace-height');
-  }
+function requestVisibleHeight(force = false) {
+  if (viewportFrame) cancelAnimationFrame(viewportFrame);
+  viewportFrame = requestAnimationFrame(() => applyVisibleHeight(force));
 }
+
+function settleVisibleHeight() {
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => requestVisibleHeight(true), 120);
+}
+
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', syncKeyboardFrame);
-  window.visualViewport.addEventListener('scroll', syncKeyboardFrame);
+  // Deliberately listen to resize only. visualViewport.scroll fires repeatedly
+  // as Safari adjusts the caret and is the main source of apparent bobbing.
+  window.visualViewport.addEventListener('resize', () => {
+    requestVisibleHeight();
+    settleVisibleHeight();
+  });
 }
-window.addEventListener('resize', syncKeyboardFrame);
-editor.addEventListener('focus', () => requestAnimationFrame(syncKeyboardFrame));
-editor.addEventListener('blur', () => setTimeout(syncKeyboardFrame, 80));
+
+window.addEventListener('resize', () => {
+  requestVisibleHeight();
+  settleVisibleHeight();
+});
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => requestVisibleHeight(true), 180);
+});
+
+editor.addEventListener('focus', () => {
+  requestVisibleHeight(true);
+  settleVisibleHeight();
+});
+
+editor.addEventListener('blur', () => {
+  setTimeout(() => requestVisibleHeight(true), 140);
+});
 
 reminderToggle.checked=settings.reminder; formattingToggle.checked=settings.formatting;
 symbolsToggle.checked=settings.symbolsBar; autoUpdateToggle.checked=settings.autoUpdate;
 thresholdSelect.value=String(settings.threshold); symbolsInput.value=settings.symbols;
 $('currentVersionText').textContent=APP_VERSION;
-refreshSymbols(); applyBarVisibility(); loadCurrentDocument(); syncKeyboardFrame();
+refreshSymbols(); applyBarVisibility(); loadCurrentDocument(); requestVisibleHeight(true);
 showUpdatedMessageIfNeeded();
 if (settings.autoUpdate) setTimeout(() => checkForUpdates(false), 900);
 

@@ -158,9 +158,7 @@ body.formatting-on .symbol-bar {
   transform: translateZ(0);
   will-change: auto;
 }
-.keyboard-open .workspace {
-  height: var(--visual-workspace-height, auto);
-}
+
 @media (min-width:760px) {
   .statusbar {
     left: 24px;
@@ -210,4 +208,96 @@ body.symbols-on.formatting-on .symbol-bar { bottom: var(--format-height); }
 }
 .updates-section h3 {
   margin: 14px 0 4px;
+}
+
+
+/* WarmWrite 1.5.1 — stable iPhone keyboard dock
+   The visible viewport height is measured in JavaScript. The complete app shell
+   is resized once as the keyboard opens/closes; the three lower rows remain
+   inside the workspace and therefore move as one rigid unit. */
+:root {
+  --ww-visible-height: 100dvh;
+}
+
+html,
+body {
+  width: 100%;
+  height: var(--ww-visible-height);
+  min-height: 0;
+  overflow: hidden;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+.app-shell {
+  width: 100%;
+  height: var(--ww-visible-height);
+  min-height: 0;
+  max-height: var(--ww-visible-height);
+  overflow: hidden;
+}
+
+.topbar {
+  flex: 0 0 72px;
+}
+
+.workspace {
+  flex: 1 1 0;
+  width: 100%;
+  height: auto !important;
+  min-height: 0;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+.editor-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.editor {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* No easing or independent movement: all dock rows move only because their
+   containing workspace changes height. */
+.statusbar,
+.symbol-bar,
+.format-bar {
+  transition: none !important;
+  animation: none !important;
+  will-change: auto !important;
+  transform: none !important;
+  backface-visibility: hidden;
+}
+
+.statusbar {
+  position: absolute !important;
+}
+
+.symbol-bar,
+.format-bar {
+  position: absolute !important;
+}
+
+/* Prevent iOS scroll anchoring from nudging the fixed writing frame. */
+.topbar,
+.workspace,
+.statusbar,
+.symbol-bar,
+.format-bar {
+  overflow-anchor: none;
+}
+
+@supports (height: 100svh) {
+  :root {
+    --ww-visible-height: 100svh;
+  }
 }

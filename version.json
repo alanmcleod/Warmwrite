@@ -1,8 +1,8 @@
 {
-  "version": "1.5",
+  "version": "1.5.1",
   "notes": [
-    "Optional Quick Symbols bar",
-    "Update checks in Settings",
-    "Update Now or Later from Settings"
+    "Stable lower toolbar dock above the iPhone keyboard",
+    "Word count, symbols and formatting rows move as one block",
+    "Removed small viewport movements that caused bobbing"
   ]
 }

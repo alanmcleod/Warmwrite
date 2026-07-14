@@ -1,4 +1,4 @@
-const CACHE = 'warmwrite-v1-5';
+const CACHE = 'warmwrite-v1-5-1';
 const ASSETS = [
   './','./index.html','./style.css','./app.js','./manifest.webmanifest',
   './version.json','./icon.svg','./icons/apple-touch-icon.png',
