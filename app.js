@@ -5,9 +5,10 @@ const OLD_DOC_KEY = 'warmwrite.document.v1';
 const DOCS_KEY = 'warmwrite.documents.v2';
 const CURRENT_KEY = 'warmwrite.current.v2';
 const SETTINGS_KEY = 'warmwrite.settings.v1';
-const APP_VERSION = '1.5';
+const APP_VERSION = '1.5.2';
 const VERSION_URL = './version.json';
 const LAST_VERSION_KEY = 'warmwrite.lastVersionSeen';
+const DISMISSED_UPDATE_KEY = 'warmwrite.dismissedUpdate';
 const BASE_COLOR = [255,250,240], WARM_COLOR = [255,173,77], HOT_COLOR = [244,97,37];
 
 const $ = id => document.getElementById(id);
@@ -141,16 +142,28 @@ async function checkForUpdates(showResult=false) {
   try {
     const response = await fetch(`${VERSION_URL}?t=${Date.now()}`, {cache:'no-store'});
     if (!response.ok) throw new Error('Version check failed');
+
     const data = await response.json();
-    availableVersion = data.version || APP_VERSION;
+    availableVersion = String(data.version || APP_VERSION).trim();
     $('latestVersionText').textContent = availableVersion;
+
     const newer = compareVersions(availableVersion, APP_VERSION) > 0;
     $('settingsUpdateBtn').hidden = !newer;
-    if (newer) {
-      $('updateMessage').textContent = `WarmWrite ${availableVersion} is available. You can update now or continue writing and update later from Settings.`;
-      $('updateDialog').showModal();
-    } else if (showResult) {
-      alert(`WarmWrite ${APP_VERSION} is up to date.`);
+
+    // A completed update must never trigger another prompt for the same version.
+    if (!newer) {
+      localStorage.removeItem(DISMISSED_UPDATE_KEY);
+      if (showResult) alert(`WarmWrite ${APP_VERSION} is up to date.`);
+      return;
+    }
+
+    const dismissedVersion = localStorage.getItem(DISMISSED_UPDATE_KEY);
+    const shouldPrompt = showResult || dismissedVersion !== availableVersion;
+
+    if (shouldPrompt) {
+      $('updateMessage').textContent =
+        `WarmWrite ${availableVersion} is available. You can update now or continue writing and update later from Settings.`;
+      if (!$('updateDialog').open) $('updateDialog').showModal();
     }
   } catch {
     $('latestVersionText').textContent = 'Unable to check';
@@ -160,14 +173,29 @@ async function checkForUpdates(showResult=false) {
 async function installUpdate() {
   saveDocument();
   autosaveStatus.textContent = 'Updating…';
+
+  const targetVersion = availableVersion || APP_VERSION;
+  localStorage.setItem(LAST_VERSION_KEY, targetVersion);
+  localStorage.removeItem(DISMISSED_UPDATE_KEY);
+
   try {
     if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(registration => registration.update()));
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.update();
+
+        // When a waiting worker exists, activate it now.
+        if (registration.waiting) {
+          registration.waiting.postMessage({type:'SKIP_WAITING'});
+        }
+      }
     }
   } catch {}
-  localStorage.setItem(LAST_VERSION_KEY, availableVersion || APP_VERSION);
-  location.reload();
+
+  // Cache-busting query prevents Safari from immediately reopening the old shell.
+  const url = new URL(location.href);
+  url.searchParams.set('wwv', targetVersion);
+  location.replace(url.toString());
 }
 function showUpdatedMessageIfNeeded() {
   const previous = localStorage.getItem(LAST_VERSION_KEY);
@@ -530,8 +558,15 @@ symbolsInput.addEventListener('change',()=>{ settings.symbols=symbolsInput.value
 $('checkUpdatesBtn').addEventListener('click', e => { e.preventDefault(); checkForUpdates(true); });
 $('settingsUpdateBtn').addEventListener('click', e => { e.preventDefault(); installUpdate(); });
 $('updateNowBtn').addEventListener('click', e => { e.preventDefault(); installUpdate(); });
-$('laterSettingsBtn').addEventListener('click', e => { e.preventDefault(); $('updateDialog').close(); });
-$('closeUpdateBtn').addEventListener('click', () => $('updateDialog').close());
+$('laterSettingsBtn').addEventListener('click', e => {
+  e.preventDefault();
+  if (availableVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
+  $('updateDialog').close();
+});
+$('closeUpdateBtn').addEventListener('click', () => {
+  if (availableVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
+  $('updateDialog').close();
+});
 
 $('resetSettingsBtn').addEventListener('click',e=>{
   e.preventDefault();

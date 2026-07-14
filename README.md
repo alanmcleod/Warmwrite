@@ -24,7 +24,7 @@ WarmWrite isn't trying to replace Microsoft Word.
 It is designed for the moment when an idea arrives and you simply want to
 start writing.
 
-## Version 1.5.1
+## Version 1.5.2
 
 - Optional Quick Symbols bar
 - Optional Bold / Italic / Strikethrough bar
@@ -38,3 +38,8 @@ start writing.
 - Keeps the word-count, Quick Symbols and formatting controls above the iPhone keyboard.
 - Moves all enabled lower controls as one rigid dock.
 - Ignores tiny iOS viewport fluctuations to prevent visible bobbing.
+
+- Corrects the repeated update prompt.
+- Remembers when an offered update is dismissed for later.
+- Forces Safari to request the newly installed app shell after an update.
+- Note: the iPhone keyboard navigation strip (up/down arrows and tick) is native iOS interface and cannot reliably be hidden by a website.

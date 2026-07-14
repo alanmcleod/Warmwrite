@@ -1,8 +1,9 @@
 {
-  "version": "1.5.1",
+  "version": "1.5.2",
   "notes": [
-    "Stable lower toolbar dock above the iPhone keyboard",
-    "Word count, symbols and formatting rows move as one block",
-    "Removed small viewport movements that caused bobbing"
+    "Stops repeated update prompts after updating",
+    "Remembers Later or close for the offered version",
+    "More reliable service-worker activation on iPhone",
+    "Stable dock remains above the keyboard"
   ]
 }

@@ -1,4 +1,4 @@
-const CACHE = 'warmwrite-v1-5-1';
+const CACHE = 'warmwrite-v1-5-2';
 const ASSETS = [
   './','./index.html','./style.css','./app.js','./manifest.webmanifest',
   './version.json','./icon.svg','./icons/apple-touch-icon.png',
@@ -37,4 +37,8 @@ self.addEventListener('fetch', event => {
       cached => cached || caches.match('./index.html')
     ))
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
