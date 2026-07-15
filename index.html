@@ -4,152 +4,171 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f7efd9">
-  <meta name="description" content="WarmWrite — a tiny, phone-friendly writing app.">
+  <meta name="description" content="WarmWrite — a simple, phone-friendly writing app.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icons/favicon.png">
   <link rel="stylesheet" href="style.css">
   <title>WarmWrite</title>
 </head>
-<body>
-  <div class="app-shell">
-    <header class="topbar">
-      <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
-      <div class="doc-meta">
-        <input id="docTitle" aria-label="Document title" value="Untitled" maxlength="80">
-        <div id="autosaveStatus" class="subtle">Saved locally</div>
-      </div>
-      <div class="top-actions">
-        <button id="undoBtn" class="icon-btn" aria-label="Undo">↶</button>
-        <button id="redoBtn" class="icon-btn" aria-label="Redo">↷</button>
-        <button id="moreBtn" class="icon-btn" aria-label="Settings">⋮</button>
-      </div>
-    </header>
+<body class="font-classic">
+<div class="app-shell">
+  <header class="topbar">
+    <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+    <div class="doc-meta">
+      <input id="docTitle" value="Untitled" maxlength="80" aria-label="Document title">
+      <div id="saveStatus" class="subtle">✓ Saved</div>
+    </div>
+    <div class="top-actions">
+      <button id="helpBtn" class="icon-btn" aria-label="Instructions">?</button>
+      <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙️</button>
+      <button id="focusBtn" class="focus-btn" aria-pressed="false">Focus is Off</button>
+    </div>
+  </header>
 
-    <aside id="drawer" class="drawer" aria-hidden="true">
-      <div class="drawer-head">
-        <strong>WarmWrite</strong>
-        <button id="closeDrawer" class="icon-btn" aria-label="Close menu">×</button>
-      </div>
-      <button id="newDocBtn" class="menu-row">New document</button>
-      <label class="menu-row file-row">Open document…<input id="openDocument" type="file" accept="text/plain,.txt,application/rtf,text/rtf,.rtf" hidden></label>
-      <div id="recentSection" class="recent-section">
-        <div class="recent-heading">Recent</div>
-        <div id="recentList"></div>
-      </div>
-      <button id="settingsBtn" class="menu-row">Settings</button>
-      <button id="aboutBtn" class="menu-row">About</button>
-    </aside>
-    <div id="scrim" class="scrim" hidden></div>
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-head"><strong>WarmWrite</strong><button id="closeDrawerBtn" class="icon-btn">×</button></div>
+    <button id="closeFileBtn" class="menu-row">Close file</button>
+    <button id="newFileBtn" class="menu-row">New document</button>
+    <label class="menu-row file-row">Open document…<input id="openInput" type="file" accept=".txt,.rtf,text/plain,text/rtf,application/rtf" hidden></label>
+    <div class="recent-heading">Recent</div>
+    <div id="drawerRecent"></div>
+  </aside>
+  <div id="scrim" class="scrim" hidden></div>
 
-    <main class="workspace">
-      <section id="editorWrap" class="editor-wrap">
-        <div id="editor" class="editor" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" data-placeholder="Start writing…"></div>
-        <div class="statusbar">
-          <button id="statsBtn" class="stats-btn"><span id="wordCount">0</span> words <span id="sessionCount" class="session-count">+0 this session</span></button>
-          <span class="unsaved"><span class="dot"></span><span id="unsavedCount">0</span> unsaved</span>
-          <button id="exportBtn" class="export-btn">Export</button>
-        </div>
+  <section id="homeScreen" class="home-screen" hidden>
+    <div class="home-inner">
+      <h1>WarmWrite</h1>
+      <section id="continueCard" class="continue-card" hidden>
+        <div class="home-label">Continue Writing</div>
+        <h2 id="continueTitle"></h2>
+        <div id="continueMeta" class="continue-meta"></div>
+        <button id="continueBtn" class="home-primary">Continue ▶</button>
       </section>
 
-      <div id="symbolBar" class="symbol-bar" aria-label="Quick symbols"></div>
-
-      <nav id="formatBar" class="format-bar" aria-label="Formatting controls">
-        <button class="format-btn" data-cmd="bold" aria-label="Bold"><strong>B</strong></button>
-        <button class="format-btn" data-cmd="italic" aria-label="Italic"><em>I</em></button>
-        <button class="format-btn" data-cmd="strikeThrough" aria-label="Strikethrough"><s>S</s></button>
-        <span class="divider"></span>
-        <button id="hideKeyboardBtn" class="format-btn keyboard-btn" aria-label="Hide keyboard">⌨</button>
-      </nav>
-    </main>
-  </div>
-
-  <dialog id="exportDialog" class="panel-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><strong>Export document</strong><button value="cancel" class="icon-btn">×</button></div>
-      <p class="subtle">Exporting resets the save-reminder count.</p>
-      <button id="exportTxtBtn" value="cancel" class="primary-row">Save as TXT</button>
-      <button id="exportRtfBtn" value="cancel" class="primary-row">Save as RTF</button>
-    </form>
-  </dialog>
-
-  <dialog id="settingsDialog" class="panel-dialog settings-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><strong>Settings</strong><button value="cancel" class="icon-btn">×</button></div>
-      <label class="setting-row">
-        <span><strong>Formatting bar</strong><small>Show bold, italic and strikethrough while writing.</small></span>
-        <input id="formattingToggle" type="checkbox">
-      </label>
-      <label class="setting-row">
-        <span><strong>Save reminder</strong><small>Warm the page as unsaved changes build up.</small></span>
-        <input id="reminderToggle" type="checkbox" checked>
-      </label>
-      <label class="setting-block">
-        <span><strong>Threshold</strong><small>Unsaved words before the page reaches orange.</small></span>
-        <select id="thresholdSelect">
-          <option value="100">100 words</option>
-          <option value="300" selected>300 words</option>
-          <option value="500">500 words</option>
-          <option value="1000">1,000 words</option>
-        </select>
-      </label>
-      <label class="setting-row">
-        <span><strong>Quick symbols bar</strong><small>Show quick-insert symbols above the keyboard.</small></span>
-        <input id="symbolsToggle" type="checkbox" checked>
-      </label>
-      <label id="symbolsEditorRow" class="setting-block">
-        <span><strong>Quick symbols</strong><small>Edit the buttons shown above the keyboard.</small></span>
-        <input id="symbolsInput" type="text" value="— “ ” ‘ ’ … ( ) ? ! : ;">
-      </label>
-      <section class="updates-section">
-        <h3>Updates</h3>
-        <div class="stat-row"><span>Current version</span><strong id="currentVersionText">1.5</strong></div>
-        <div class="stat-row"><span>Latest version</span><strong id="latestVersionText">Not checked</strong></div>
-        <label class="setting-row">
-          <span><strong>Automatically check</strong><small>Check for a newer version when WarmWrite opens.</small></span>
-          <input id="autoUpdateToggle" type="checkbox" checked>
-        </label>
-        <button id="checkUpdatesBtn" value="cancel" class="primary-row">Check for updates</button>
-        <button id="settingsUpdateBtn" value="cancel" class="primary-row" hidden>Update now</button>
+      <section class="home-section">
+        <div class="home-label">Recent Documents</div>
+        <div id="homeRecent"></div>
       </section>
-      <button id="resetSettingsBtn" value="cancel" class="danger-row">Reset app data</button>
-    </form>
-  </dialog>
 
-  <dialog id="statsDialog" class="panel-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><strong>Document stats</strong><button value="cancel" class="icon-btn">×</button></div>
-      <div class="stat-row"><span>Words</span><strong id="statsWords">0</strong></div>
-      <div class="stat-row"><span>Characters</span><strong id="statsChars">0</strong></div>
-      <div class="stat-row"><span>This session</span><strong id="statsSession">+0</strong></div>
-    </form>
-  </dialog>
+      <div class="home-actions">
+        <button id="homeNewBtn" class="home-primary">New Document</button>
+        <label class="home-secondary">Import Document<input id="homeImportInput" type="file" accept=".txt,.rtf,text/plain,text/rtf,application/rtf" hidden></label>
+        <button id="homeSettingsBtn" class="home-secondary">Settings</button>
+      </div>
+    </div>
+  </section>
 
-  <dialog id="updateDialog" class="panel-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><strong>WarmWrite update available</strong><button id="closeUpdateBtn" value="cancel" class="icon-btn" aria-label="Close">×</button></div>
-      <p id="updateMessage">A newer version of WarmWrite is available.</p>
-      <button id="updateNowBtn" value="cancel" class="primary-row">Update now</button>
-      <button id="laterSettingsBtn" value="cancel" class="menu-row">Later — update from Settings</button>
-    </form>
-  </dialog>
+  <main id="workspace" class="workspace">
+    <section id="editorWrap" class="editor-wrap">
+      <div id="editor" class="editor" contenteditable="true" spellcheck="true" data-placeholder="Start writing…"></div>
+    </section>
 
-  <dialog id="updatedDialog" class="panel-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><strong>WarmWrite updated</strong><button value="cancel" class="icon-btn">×</button></div>
-      <p id="updatedMessage">WarmWrite has been updated.</p>
-      <button value="cancel" class="primary-row">OK</button>
-    </form>
-  </dialog>
+    <div id="statusBar" class="statusbar">
+      <button id="statsBtn" class="stats-btn"><span id="wordCount">0</span> words <span id="sessionCount">+0 this session</span></button>
+      <span class="unsaved"><span class="dot"></span><span id="unsavedCount">0</span> unsaved</span>
+      <button id="exportBtn" class="export-btn">Export</button>
+    </div>
 
-  <dialog id="aboutDialog" class="panel-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><strong>About WarmWrite</strong><button value="cancel" class="icon-btn">×</button></div>
-      <p>A tiny, phone-friendly writing app. Documents autosave in this browser. Export important work regularly.</p>
-      <p class="subtle">Version 1.6</p>
-    </form>
-  </dialog>
+    <div id="symbolBar" class="symbol-bar"></div>
 
-  <script src="app.js"></script>
+    <nav id="formatBar" class="format-bar">
+      <button class="format-btn" data-cmd="bold"><strong>B</strong></button>
+      <button class="format-btn" data-cmd="italic"><em>I</em></button>
+      <button class="format-btn" data-cmd="strikeThrough"><s>S</s></button>
+      <button id="hideKeyboardBtn" class="format-btn keyboard-btn">⌨</button>
+    </nav>
+  </main>
+</div>
+
+<dialog id="exportDialog" class="panel-dialog">
+  <form method="dialog">
+    <div class="dialog-head"><strong>Export document</strong><button value="cancel" class="icon-btn">×</button></div>
+    <button id="exportTxtBtn" value="cancel" class="primary-row">Save as TXT</button>
+    <button id="exportRtfBtn" value="cancel" class="primary-row">Save as RTF</button>
+  </form>
+</dialog>
+
+<dialog id="settingsDialog" class="panel-dialog">
+  <form method="dialog">
+    <div class="dialog-head"><strong>Settings</strong><button value="cancel" class="icon-btn">×</button></div>
+
+    <label class="setting-block">
+      <span><strong>Writing font</strong><small>Applies to every document.</small></span>
+      <select id="fontSelect">
+        <option value="classic">Classic — Times New Roman</option>
+        <option value="modern">Modern — Arial</option>
+      </select>
+    </label>
+
+    <label class="setting-row">
+      <span><strong>Formatting bar</strong><small>Show bold, italic and strikethrough.</small></span>
+      <input id="formatToggle" type="checkbox">
+    </label>
+
+    <label class="setting-row">
+      <span><strong>Quick symbols bar</strong><small>Show editable quick-insert symbols.</small></span>
+      <input id="symbolsToggle" type="checkbox" checked>
+    </label>
+
+    <label id="symbolsEditorRow" class="setting-block">
+      <span><strong>Quick symbols</strong><small>Separate symbols with spaces.</small></span>
+      <input id="symbolsInput" type="text" value=". , “ ” ‘ ’ ? ! — … ( ) : ; # % & £ $ €">
+    </label>
+
+    <label class="setting-row">
+      <span><strong>Save reminder</strong><small>Warm the page as unexported changes build up.</small></span>
+      <input id="reminderToggle" type="checkbox" checked>
+    </label>
+
+    <label class="setting-block">
+      <span><strong>Reminder threshold</strong></span>
+      <select id="thresholdSelect">
+        <option value="100">100 words</option>
+        <option value="300" selected>300 words</option>
+        <option value="500">500 words</option>
+        <option value="1000">1,000 words</option>
+      </select>
+    </label>
+
+    <section class="updates-section">
+      <h3>Updates</h3>
+      <div class="stat-row"><span>Current version</span><strong>2.0</strong></div>
+      <div class="stat-row"><span>Latest version</span><strong id="latestVersion">Not checked</strong></div>
+      <label class="setting-row">
+        <span><strong>Automatically check</strong><small>At most once per day.</small></span>
+        <input id="autoUpdateToggle" type="checkbox" checked>
+      </label>
+      <button id="checkUpdatesBtn" value="cancel" class="primary-row">Check for updates</button>
+    </section>
+  </form>
+</dialog>
+
+<dialog id="helpDialog" class="panel-dialog">
+  <form method="dialog">
+    <div class="dialog-head"><strong>WarmWrite Quick Guide</strong><button value="cancel" class="icon-btn">×</button></div>
+    <div class="help-copy">
+      <p><strong>Start writing</strong><br>Create or open a document, tap the page and type.</p>
+      <p><strong>Continue Writing</strong><br>Close a file to return to the Home screen. Your latest document appears first.</p>
+      <p><strong>Word count</strong><br>Your total and session word counts appear below the page.</p>
+      <p><strong>Save reminder</strong><br>The page can gradually change from cream towards orange as unexported changes accumulate.</p>
+      <p><strong>Focus Mode</strong><br>Tap “Focus is Off” to hide the lower bars. The colour reminder remains active.</p>
+      <p><strong>Open formats</strong><br>WarmWrite opens and exports TXT and simple RTF documents.</p>
+      <p><strong>Privacy</strong><br>Your documents stay in this browser unless you export them.</p>
+    </div>
+    <button value="cancel" class="primary-row">Close</button>
+  </form>
+</dialog>
+
+<dialog id="statsDialog" class="panel-dialog">
+  <form method="dialog">
+    <div class="dialog-head"><strong>Document stats</strong><button value="cancel" class="icon-btn">×</button></div>
+    <div class="stat-row"><span>Words</span><strong id="statsWords">0</strong></div>
+    <div class="stat-row"><span>Characters</span><strong id="statsChars">0</strong></div>
+    <div class="stat-row"><span>This session</span><strong id="statsSession">+0</strong></div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
 </body>
 </html>

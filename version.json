@@ -1,9 +1,12 @@
 {
-  "version": "1.6",
+  "version": "2.0",
   "notes": [
-    "Update checks occur automatically at most once per day",
-    "Dismissed updates remain available in Settings without repeated prompts",
-    "Single controlled reload after an update",
-    "Calm rigid toolbar dock for extended testing"
+    "Continue Writing home screen",
+    "Close File",
+    "Focus Mode with colour save reminder retained",
+    "Classic or Modern global font",
+    "Help and Settings controls in title bar",
+    "Pasted text cleaned and standardised",
+    "New editable Quick Symbols defaults"
   ]
 }

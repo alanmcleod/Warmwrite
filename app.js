@@ -1,618 +1,230 @@
 (() => {
 'use strict';
 
-const OLD_DOC_KEY = 'warmwrite.document.v1';
-const DOCS_KEY = 'warmwrite.documents.v2';
-const CURRENT_KEY = 'warmwrite.current.v2';
-const SETTINGS_KEY = 'warmwrite.settings.v1';
-const APP_VERSION = '1.6';
-const VERSION_URL = './version.json';
-const LAST_VERSION_KEY = 'warmwrite.lastVersionSeen';
-const DISMISSED_UPDATE_KEY = 'warmwrite.dismissedUpdate';
-const UPDATE_CHECKED_AT_KEY = 'warmwrite.updateCheckedAt';
-const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
-const BASE_COLOR = [255,250,240], WARM_COLOR = [255,173,77], HOT_COLOR = [244,97,37];
+const APP_VERSION='2.0';
+const DOCS_KEY='warmwrite.documents.v2';
+const CURRENT_KEY='warmwrite.current.v2';
+const SETTINGS_KEY='warmwrite.settings.v2';
+const UPDATE_KEY='warmwrite.updateCheckedAt';
+const VERSION_URL='./version.json';
+const DEFAULT_SYMBOLS='. , “ ” ‘ ’ ? ! — … ( ) : ; # % & £ $ €';
+const $=id=>document.getElementById(id);
 
-const $ = id => document.getElementById(id);
-const editor = $('editor'), editorWrap = $('editorWrap'), docTitle = $('docTitle');
-const wordCount = $('wordCount'), sessionCount = $('sessionCount'), unsavedCount = $('unsavedCount');
-const autosaveStatus = $('autosaveStatus'), symbolBar = $('symbolBar');
-const reminderToggle = $('reminderToggle'), formattingToggle = $('formattingToggle');
-const symbolsToggle = $('symbolsToggle'), autoUpdateToggle = $('autoUpdateToggle');
-const thresholdSelect = $('thresholdSelect'), symbolsInput = $('symbolsInput');
+const editor=$('editor'), editorWrap=$('editorWrap'), docTitle=$('docTitle'), saveStatus=$('saveStatus');
+let docs=loadJSON(DOCS_KEY,[]);
+let currentId=localStorage.getItem(CURRENT_KEY)||'';
+let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, savedRange=null, focusMode=false;
+let settings={reminder:true,threshold:300,formatting:false,symbolsBar:true,symbols:DEFAULT_SYMBOLS,font:'classic',autoUpdate:true,...loadJSON(SETTINGS_KEY,{})};
 
-let settings = loadSettings();
-let documents = loadDocuments();
-let currentId = localStorage.getItem(CURRENT_KEY);
-let currentDoc = null;
-let baselineWords = 0;
-let sessionStartWords = 0;
-let saveTimer = null;
-let savedRange = null;
-let availableVersion = null;
+function loadJSON(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}}
+function saveJSON(key,val){localStorage.setItem(key,JSON.stringify(val))}
+function uid(){return `${Date.now()}-${Math.random().toString(36).slice(2,8)}`}
+function countWords(t){const s=t.trim();return s?s.split(/\s+/u).length:0}
+function textNow(){return editor.innerText.replace(/\u00a0/g,' ')}
+function titleNow(){return docTitle.value.trim()||'Untitled'}
+function formatDate(ts){const d=new Date(ts||Date.now()),today=new Date();const day=d.toDateString()===today.toDateString()?'Today':d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});return `${day}, ${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`}
 
-function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2,9)}`; }
-function countWords(text) { const clean = text.trim(); return clean ? clean.split(/\s+/u).length : 0; }
-function textNow() { return editor.innerText.replace(/\u00a0/g,' '); }
-function titleNow() { return docTitle.value.trim() || 'Untitled'; }
-
-function loadSettings() {
-  const defaults = { reminder:true, threshold:300, symbols:'— “ ” ‘ ’ … ( ) ? ! : ;', formatting:false, symbolsBar:true, autoUpdate:true };
-  try { return {...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')}; }
-  catch { return defaults; }
+function ensureDoc(){
+  currentDoc=docs.find(d=>d.id===currentId)||docs[0];
+  if(!currentDoc){
+    currentDoc={id:uid(),title:'Untitled',html:'',baselineWords:0,updatedAt:Date.now()};
+    docs=[currentDoc];
+  }
+  currentId=currentDoc.id;
+  localStorage.setItem(CURRENT_KEY,currentId);
 }
-function saveSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-
-function loadDocuments() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
-    if (Array.isArray(stored) && stored.length) return stored;
-  } catch {}
-  try {
-    const old = JSON.parse(localStorage.getItem(OLD_DOC_KEY) || '{}');
-    if (old.html || old.title) {
-      const migrated = [{id:uid(), title:old.title || 'Untitled', html:old.html || '', baselineWords:Number.isFinite(old.baselineWords) ? old.baselineWords : 0, updatedAt:Date.now()}];
-      localStorage.setItem(DOCS_KEY, JSON.stringify(migrated));
-      localStorage.setItem(CURRENT_KEY, migrated[0].id);
-      return migrated;
-    }
-  } catch {}
-  return [];
+function loadCurrent(){
+  ensureDoc();
+  docTitle.value=currentDoc.title||'Untitled';
+  editor.innerHTML=currentDoc.html||'';
+  baselineWords=Number.isFinite(currentDoc.baselineWords)?currentDoc.baselineWords:countWords(textNow());
+  sessionStartWords=countWords(textNow());
+  updateStats();
 }
-function persistDocuments() {
-  documents.sort((a,b) => b.updatedAt - a.updatedAt);
-  localStorage.setItem(DOCS_KEY, JSON.stringify(documents));
-  localStorage.setItem(CURRENT_KEY, currentId || '');
+function persist(){
+  if(!currentDoc)return;
+  currentDoc.title=titleNow();
+  currentDoc.html=editor.innerHTML;
+  currentDoc.baselineWords=baselineWords;
+  currentDoc.updatedAt=Date.now();
+  docs.sort((a,b)=>b.updatedAt-a.updatedAt);
+  saveJSON(DOCS_KEY,docs);
+  localStorage.setItem(CURRENT_KEY,currentId);
+  saveStatus.textContent='✓ Saved';
   renderRecents();
 }
-function createBlankDocument(focus=false) {
-  const doc = {id:uid(), title:'Untitled', html:'', baselineWords:0, updatedAt:Date.now()};
-  documents.push(doc); currentId = doc.id; currentDoc = doc;
-  docTitle.value = doc.title; editor.innerHTML = ''; baselineWords = 0; sessionStartWords = 0;
-  persistDocuments(); updateStats(); saveDocument();
-  if (focus) editor.focus();
+function queueSave(){saveStatus.textContent='Saving…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,300)}
+function createDoc(){
+  persist();
+  const d={id:uid(),title:'Untitled',html:'',baselineWords:0,updatedAt:Date.now()};
+  docs.unshift(d);currentDoc=d;currentId=d.id;localStorage.setItem(CURRENT_KEY,currentId);
+  docTitle.value='Untitled';editor.innerHTML='';baselineWords=0;sessionStartWords=0;persist();updateStats();
 }
-function loadCurrentDocument() {
-  currentDoc = documents.find(d => d.id === currentId) || documents[0];
-  if (!currentDoc) return createBlankDocument(false);
-  currentId = currentDoc.id;
-  docTitle.value = currentDoc.title || 'Untitled';
-  editor.innerHTML = currentDoc.html || '';
-  baselineWords = Number.isFinite(currentDoc.baselineWords) ? currentDoc.baselineWords : countWords(textNow());
-  sessionStartWords = countWords(textNow());
-  persistDocuments(); updateStats();
+function switchDoc(id){
+  persist();
+  const d=docs.find(x=>x.id===id);if(!d)return;
+  currentDoc=d;currentId=d.id;localStorage.setItem(CURRENT_KEY,id);
+  loadCurrent();closeDrawer();
 }
-function saveDocument() {
-  if (!currentDoc) return;
-  currentDoc.title = titleNow();
-  currentDoc.html = editor.innerHTML;
-  currentDoc.baselineWords = baselineWords;
-  currentDoc.updatedAt = Date.now();
-  persistDocuments();
-  autosaveStatus.textContent = 'Saved locally';
-}
-function queueAutosave() {
-  autosaveStatus.textContent = 'Saving…';
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveDocument, 350);
-}
-function hasUnsavedWords() { return Math.abs(countWords(textNow()) - baselineWords) > 0; }
 
-function mix(a,b,t) { return a.map((v,i) => Math.round(v + (b[i]-v)*t)); }
-function updateStats() {
-  const total = countWords(textNow());
-  const changed = Math.abs(total - baselineWords);
-  const session = total - sessionStartWords;
-  wordCount.textContent = total.toLocaleString('en-GB');
-  sessionCount.textContent = `${session >= 0 ? '+' : '−'}${Math.abs(session).toLocaleString('en-GB')} this session`;
-  unsavedCount.textContent = changed.toLocaleString('en-GB');
-  let rgb = BASE_COLOR;
-  if (settings.reminder) {
-    const threshold = Math.max(1, settings.threshold);
-    rgb = changed <= threshold ? mix(BASE_COLOR,WARM_COLOR,Math.min(1,changed/threshold)) : mix(WARM_COLOR,HOT_COLOR,Math.min(1,(changed-threshold)/threshold));
+function applySettings(){
+  document.body.classList.toggle('formatting-on',settings.formatting);
+  document.body.classList.toggle('symbols-on',settings.symbolsBar);
+  document.body.classList.toggle('font-modern',settings.font==='modern');
+  document.body.classList.toggle('font-classic',settings.font!=='modern');
+  $('formatToggle').checked=settings.formatting;
+  $('symbolsToggle').checked=settings.symbolsBar;
+  $('symbolsEditorRow').hidden=!settings.symbolsBar;
+  $('symbolsInput').value=settings.symbols;
+  $('fontSelect').value=settings.font;
+  $('reminderToggle').checked=settings.reminder;
+  $('thresholdSelect').value=String(settings.threshold);
+  $('autoUpdateToggle').checked=settings.autoUpdate;
+  renderSymbols();
+}
+function renderSymbols(){
+  const bar=$('symbolBar');bar.innerHTML='';
+  settings.symbols.trim().split(/\s+/u).filter(Boolean).forEach(sym=>{
+    const b=document.createElement('button');b.className='symbol-btn';b.textContent=sym;
+    b.addEventListener('pointerdown',e=>e.preventDefault());
+    b.addEventListener('click',()=>insertText(sym));
+    bar.appendChild(b);
+  });
+}
+function updateStats(){
+  const total=countWords(textNow()),unsaved=Math.abs(total-baselineWords),session=total-sessionStartWords;
+  $('wordCount').textContent=total.toLocaleString('en-GB');
+  $('sessionCount').textContent=`${session>=0?'+':'−'}${Math.abs(session).toLocaleString('en-GB')} this session`;
+  $('unsavedCount').textContent=unsaved.toLocaleString('en-GB');
+  let c='rgb(255,250,240)';
+  if(settings.reminder){
+    const t=Math.min(1,unsaved/Math.max(1,settings.threshold));
+    c=`rgb(255,${Math.round(250-77*t)},${Math.round(240-163*t)})`;
   }
-  const colour = `rgb(${rgb.join(',')})`;
-  editorWrap.style.backgroundColor = colour; editor.style.backgroundColor = colour;
+  editorWrap.style.backgroundColor=c;editor.style.backgroundColor=c;
 }
-function showStats() {
-  const text = textNow(), total = countWords(text), session = total - sessionStartWords;
-  $('statsWords').textContent = total.toLocaleString('en-GB');
-  $('statsChars').textContent = text.length.toLocaleString('en-GB');
-  $('statsSession').textContent = `${session >= 0 ? '+' : '−'}${Math.abs(session).toLocaleString('en-GB')}`;
-  $('statsDialog').showModal();
+function setFocus(on){
+  focusMode=!!on;document.body.classList.toggle('focus-mode',focusMode);
+  $('focusBtn').textContent=focusMode?'Focus is On':'Focus is Off';
+  $('focusBtn').setAttribute('aria-pressed',String(focusMode));
+}
+function showHome(){
+  persist();setFocus(false);document.body.classList.add('home-open');$('homeScreen').hidden=false;renderHome();closeDrawer();
+}
+function showEditor(){document.body.classList.remove('home-open');$('homeScreen').hidden=true}
+function renderHome(){
+  const sorted=[...docs].sort((a,b)=>b.updatedAt-a.updatedAt),latest=sorted[0],card=$('continueCard');
+  if(latest){
+    card.hidden=false;$('continueTitle').textContent=latest.title||'Untitled';
+    const tmp=document.createElement('div');tmp.innerHTML=latest.html||'';
+    $('continueMeta').textContent=`${countWords(tmp.innerText||'').toLocaleString('en-GB')} words · Last edited ${formatDate(latest.updatedAt)}`;
+    $('continueBtn').dataset.id=latest.id;
+  }else card.hidden=true;
+  const list=$('homeRecent');list.innerHTML='';
+  sorted.slice(1,4).forEach(d=>{
+    const tmp=document.createElement('div');tmp.innerHTML=d.html||'';
+    const b=document.createElement('button');b.className='home-recent-btn';
+    const strong=document.createElement('strong'),small=document.createElement('small');
+    strong.textContent=d.title||'Untitled';small.textContent=`${countWords(tmp.innerText||'')} words · ${formatDate(d.updatedAt)}`;
+    b.append(strong,small);b.addEventListener('click',()=>{switchDoc(d.id);showEditor()});list.appendChild(b);
+  });
+  if(!list.children.length)list.innerHTML='<div class="subtle">No other recent documents</div>';
+}
+function renderRecents(){
+  const list=$('drawerRecent');list.innerHTML='';
+  [...docs].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,3).forEach(d=>{
+    const b=document.createElement('button');b.className='recent-btn';b.textContent=d.title||'Untitled';b.addEventListener('click',()=>switchDoc(d.id));list.appendChild(b);
+  });
+}
+function openDrawer(){$('drawer').classList.add('open');$('scrim').hidden=false}
+function closeDrawer(){$('drawer').classList.remove('open');$('scrim').hidden=true}
+
+function rememberSelection(){
+  const s=window.getSelection();
+  if(s&&s.rangeCount&&editor.contains(s.anchorNode))savedRange=s.getRangeAt(0).cloneRange();
+}
+function restoreSelection(){if(!savedRange)return;const s=window.getSelection();s.removeAllRanges();s.addRange(savedRange)}
+function insertText(txt){
+  editor.focus();restoreSelection();const s=window.getSelection();
+  if(!s||!s.rangeCount)return;
+  const r=s.getRangeAt(0);r.deleteContents();const n=document.createTextNode(txt);r.insertNode(n);r.setStartAfter(n);r.collapse(true);s.removeAllRanges();s.addRange(r);savedRange=r.cloneRange();
+  updateStats();queueSave();
+}
+function applyCommand(cmd){
+  editor.focus();restoreSelection();document.execCommand(cmd,false);rememberSelection();updateStats();queueSave();
 }
 
-function applyBarVisibility() {
-  document.body.classList.toggle('formatting-on', settings.formatting);
-  document.body.classList.toggle('symbols-on', settings.symbolsBar);
-  formattingToggle.checked = settings.formatting;
-  symbolsToggle.checked = settings.symbolsBar;
-  $('symbolsEditorRow').hidden = !settings.symbolsBar;
-}
-function compareVersions(a, b) {
-  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
-  const length = Math.max(pa.length, pb.length);
-  for (let i = 0; i < length; i++) {
-    const av = pa[i] || 0, bv = pb[i] || 0;
-    if (av > bv) return 1;
-    if (av < bv) return -1;
-  }
-  return 0;
-}
-async function checkForUpdates(manual = false) {
-  const now = Date.now();
-  const lastChecked = Number(localStorage.getItem(UPDATE_CHECKED_AT_KEY) || 0);
-
-  // Automatic checks happen at most once in 24 hours. Manual checks always run.
-  if (!manual && now - lastChecked < UPDATE_CHECK_INTERVAL) return;
-
-  $('latestVersionText').textContent = 'Checking…';
-
-  try {
-    const response = await fetch(`${VERSION_URL}?t=${now}`, {cache:'no-store'});
-    if (!response.ok) throw new Error('Version check failed');
-
-    const data = await response.json();
-    availableVersion = String(data.version || APP_VERSION).trim();
-    localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(now));
-    $('latestVersionText').textContent = availableVersion;
-
-    const newer = compareVersions(availableVersion, APP_VERSION) > 0;
-    $('settingsUpdateBtn').hidden = !newer;
-
-    if (!newer) {
-      localStorage.removeItem(DISMISSED_UPDATE_KEY);
-      if (manual) alert(`WarmWrite ${APP_VERSION} is up to date.`);
-      return;
-    }
-
-    // Closing or choosing Later suppresses automatic reminders for this exact
-    // offered version. It remains available in Settings at any time.
-    const dismissedVersion = localStorage.getItem(DISMISSED_UPDATE_KEY);
-    if (!manual && dismissedVersion === availableVersion) return;
-
-    $('updateMessage').textContent =
-      `WarmWrite ${availableVersion} is available. Update now, or continue writing and update later from Settings.`;
-
-    if (!$('updateDialog').open) $('updateDialog').showModal();
-  } catch {
-    $('latestVersionText').textContent = 'Unable to check';
-    if (manual) alert('WarmWrite could not check for updates just now.');
-  }
-}
-async function installUpdate() {
-  saveDocument();
-  autosaveStatus.textContent = 'Updating…';
-
-  const targetVersion = availableVersion || APP_VERSION;
-  localStorage.setItem(LAST_VERSION_KEY, targetVersion);
-  localStorage.removeItem(DISMISSED_UPDATE_KEY);
-  localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(Date.now()));
-
-  let reloaded = false;
-  const reloadOnce = () => {
-    if (reloaded) return;
-    reloaded = true;
-    const url = new URL(location.href);
-    url.searchParams.set('wwv', targetVersion);
-    location.replace(url.toString());
+function cleanPastedHtml(html){
+  const src=document.createElement('div');src.innerHTML=html;
+  const allowed=new Set(['B','STRONG','I','EM','S','STRIKE','DEL','BR','P','DIV']);
+  const clean=node=>{
+    if(node.nodeType===Node.TEXT_NODE)return document.createTextNode(node.nodeValue||'');
+    if(node.nodeType!==Node.ELEMENT_NODE)return document.createDocumentFragment();
+    const frag=document.createDocumentFragment();[...node.childNodes].forEach(c=>frag.appendChild(clean(c)));
+    const tag=node.tagName.toUpperCase();if(!allowed.has(tag))return frag;if(tag==='BR')return document.createElement('br');
+    const mapped=tag==='STRONG'?'b':tag==='EM'?'i':['STRIKE','DEL'].includes(tag)?'s':tag.toLowerCase();
+    const el=document.createElement(mapped);el.appendChild(frag);return el;
   };
-
-  if (!('serviceWorker' in navigator)) {
-    reloadOnce();
-    return;
-  }
-
-  navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, {once:true});
-
-  try {
-    const registration = await navigator.serviceWorker.getRegistration();
-    if (!registration) {
-      reloadOnce();
-      return;
-    }
-
-    await registration.update();
-
-    if (registration.waiting) {
-      registration.waiting.postMessage({type:'SKIP_WAITING'});
-    } else if (registration.installing) {
-      registration.installing.addEventListener('statechange', () => {
-        if (registration.waiting) registration.waiting.postMessage({type:'SKIP_WAITING'});
-      });
-    } else {
-      // The newest worker may already control this page.
-      setTimeout(reloadOnce, 450);
-    }
-  } catch {
-    reloadOnce();
-  }
-
-  // Fallback in case iOS does not emit controllerchange.
-  setTimeout(reloadOnce, 1800);
+  const out=document.createDocumentFragment();[...src.childNodes].forEach(c=>out.appendChild(clean(c)));return out;
 }
-function showUpdatedMessageIfNeeded() {
-  const previous = localStorage.getItem(LAST_VERSION_KEY);
-  if (previous && previous === APP_VERSION) {
-    localStorage.removeItem(LAST_VERSION_KEY);
-    $('updatedMessage').textContent = `WarmWrite has been updated to version ${APP_VERSION}.`;
-    setTimeout(() => $('updatedDialog').showModal(), 350);
-  }
-}
-function refreshSymbols() {
-  symbolBar.innerHTML = '';
-  settings.symbols.trim().split(/\s+/u).filter(Boolean).forEach(symbol => {
-    const btn = document.createElement('button');
-    btn.type='button'; btn.className='symbol-btn'; btn.textContent=symbol;
-    btn.addEventListener('pointerdown', e => e.preventDefault());
-    btn.addEventListener('click', () => insertAtCaret(symbol));
-    symbolBar.appendChild(btn);
-  });
-}
-function applyFormattingVisibility() { applyBarVisibility(); }
-function rememberSelection() {
-  const selection = window.getSelection();
-  if (selection && selection.rangeCount && editor.contains(selection.anchorNode)) savedRange = selection.getRangeAt(0).cloneRange();
-}
-function restoreSelection() {
-  if (!savedRange) return;
-  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(savedRange);
-}
-function insertAtCaret(text) {
-  editor.focus(); restoreSelection();
-  const selection = window.getSelection();
-  if (!selection || !selection.rangeCount) { editor.append(document.createTextNode(text)); }
-  else {
-    const range = selection.getRangeAt(0); range.deleteContents();
-    const node = document.createTextNode(text); range.insertNode(node); range.setStartAfter(node); range.collapse(true);
-    selection.removeAllRanges(); selection.addRange(range); savedRange = range.cloneRange();
-  }
-  editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));
-}
-function formattingStateForNode(node, cmd) {
-  const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-  if (!element || !editor.contains(element)) return false;
-  const style = getComputedStyle(element);
-
-  if (cmd === 'bold') {
-    const weight = Number.parseInt(style.fontWeight, 10);
-    return Number.isFinite(weight) ? weight >= 600 : ['bold', 'bolder'].includes(style.fontWeight);
-  }
-  if (cmd === 'italic') return style.fontStyle === 'italic';
-  if (cmd === 'strikeThrough') return style.textDecorationLine.split(/\s+/).includes('line-through');
-  return false;
-}
-function selectedTextNodes(range) {
-  const nodes = [];
-  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-      try { return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; }
-      catch { return NodeFilter.FILTER_REJECT; }
-    }
-  });
-  while (walker.nextNode()) nodes.push(walker.currentNode);
-  return nodes;
-}
-function selectedFormattingState(cmd, range) {
-  if (range.collapsed) return formattingStateForNode(range.startContainer, cmd);
-  const nodes = selectedTextNodes(range);
-  return nodes.length > 0 && nodes.every(node => formattingStateForNode(node, cmd));
-}
-function commandState(cmd) {
-  try { return document.queryCommandState(cmd); }
-  catch { return false; }
-}
-function toggleSelectedInline(cmd) {
-  editor.focus();
-  restoreSelection();
-
-  const selection = window.getSelection();
-  if (!selection || !selection.rangeCount) return;
-
-  const range = selection.getRangeAt(0).cloneRange();
-  const wasOn = selectedFormattingState(cmd, range);
-  const targetOn = !wasOn;
-
-  // Safari sometimes changes the selection when a toolbar control is touched.
-  // Put the saved range back immediately before issuing the edit command.
-  selection.removeAllRanges();
-  selection.addRange(range);
-  savedRange = range.cloneRange();
-
-  document.execCommand(cmd, false);
-
-  // Verify the result. If Safari ignored the first toggle, restore the same
-  // selection and retry once only when the command state still disagrees.
-  const afterFirst = commandState(cmd);
-  if (afterFirst !== targetOn) {
-    selection.removeAllRanges();
-    selection.addRange(range);
-    document.execCommand(cmd, false);
-  }
-
-  rememberSelection();
-  updateStats();
-  queueAutosave();
-}
-function applyCommand(cmd) {
-  if (['bold','italic','strikeThrough'].includes(cmd)) {
-    toggleSelectedInline(cmd);
-    return;
-  }
-  editor.focus();
-  restoreSelection();
-  document.execCommand(cmd, false);
-  rememberSelection();
-  updateStats();
-  queueAutosave();
-}
-function safeName(ext) {
-  const base = titleNow().replace(/[\\/:*?"<>|]+/g,'-').slice(0,80);
-  return `${base}.${ext}`;
-}
-function download(content,type,filename) {
-  const blob = new Blob([content],{type}), url = URL.createObjectURL(blob), link = document.createElement('a');
-  link.href=url; link.download=filename; document.body.appendChild(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url),1000);
-}
-function rtfEscape(text) {
-  return Array.from(text).map(ch => {
-    const code = ch.codePointAt(0);
-    if (ch === '\\' || ch === '{' || ch === '}') return `\\${ch}`;
-    if (ch === '\n') return '\\par\n';
-    if (code > 127) { const signed = code > 32767 ? code - 65536 : code; return `\\u${signed}?`; }
-    return ch;
-  }).join('');
-}
-function nodeToRtf(node) {
-  if (node.nodeType === Node.TEXT_NODE) return rtfEscape(node.nodeValue || '');
-  if (node.nodeType !== Node.ELEMENT_NODE) return '';
-  const tag = node.tagName.toLowerCase(), inner = Array.from(node.childNodes).map(nodeToRtf).join('');
-  if (tag === 'br') return '\\line ';
-  if (tag === 'span' && node.dataset.wwFormat === 'bold') return node.dataset.wwState === 'off' ? `{\\b0 ${inner}}` : `{\\b ${inner}}`;
-  if (tag === 'span' && node.dataset.wwFormat === 'italic') return node.dataset.wwState === 'off' ? `{\\i0 ${inner}}` : `{\\i ${inner}}`;
-  if (tag === 'b' || tag === 'strong') return `{\\b ${inner}}`;
-  if (tag === 'i' || tag === 'em') return `{\\i ${inner}}`;
-  if (tag === 's' || tag === 'strike' || tag === 'del') return `{\\strike ${inner}}`;
-  if (tag === 'div' || tag === 'p') return `${inner}\\par\n`;
-  return inner;
-}
-function parseRtf(rtf) {
-  const out = document.createElement('div');
-  let stack = [{b:false,i:false,s:false,skip:false}], state = stack[0], buffer = '';
-  const flush = () => {
-    if (!buffer || state.skip) { buffer=''; return; }
-    let node = document.createTextNode(buffer);
-    if (state.s) { const e=document.createElement('s'); e.appendChild(node); node=e; }
-    if (state.i) { const e=document.createElement('i'); e.appendChild(node); node=e; }
-    if (state.b) { const e=document.createElement('b'); e.appendChild(node); node=e; }
-    out.appendChild(node); buffer='';
-  };
-  const paragraph = () => { flush(); if (!state.skip) out.appendChild(document.createElement('br')); };
-  let i=0;
-  while (i < rtf.length) {
-    const ch = rtf[i];
-    if (ch === '{') { flush(); state={...state}; stack.push(state); i++; continue; }
-    if (ch === '}') { flush(); if (stack.length>1) stack.pop(); state=stack[stack.length-1]; i++; continue; }
-    if (ch !== '\\') { if (!state.skip && ch !== '\r' && ch !== '\n') buffer += ch; i++; continue; }
-    flush(); i++;
-    const next = rtf[i];
-    if (next === '\\' || next === '{' || next === '}') { if (!state.skip) buffer += next; i++; continue; }
-    if (next === "'") {
-      const hex = rtf.slice(i+1,i+3); if (!state.skip && /^[0-9a-f]{2}$/i.test(hex)) buffer += String.fromCharCode(parseInt(hex,16));
-      i += 3; continue;
-    }
-    if (next === '*') { state.skip=true; i++; continue; }
-    const match = rtf.slice(i).match(/^([a-zA-Z]+)(-?\d+)? ?/);
-    if (!match) { i++; continue; }
-    const word=match[1], num=match[2] === undefined ? null : Number(match[2]); i += match[0].length;
-    if (['fonttbl','colortbl','stylesheet','info','pict','object','header','footer'].includes(word)) state.skip=true;
-    else if (word === 'b') state.b = num !== 0;
-    else if (word === 'i') state.i = num !== 0;
-    else if (word === 'strike') state.s = num !== 0;
-    else if (word === 'plain') state.b=state.i=state.s=false;
-    else if (word === 'par' || word === 'line') paragraph();
-    else if (word === 'tab' && !state.skip) buffer += '\t';
-    else if (word === 'emdash' && !state.skip) buffer += '—';
-    else if (word === 'endash' && !state.skip) buffer += '–';
-    else if (word === 'lquote' && !state.skip) buffer += '‘';
-    else if (word === 'rquote' && !state.skip) buffer += '’';
-    else if (word === 'ldblquote' && !state.skip) buffer += '“';
-    else if (word === 'rdblquote' && !state.skip) buffer += '”';
-    else if (word === 'u' && num !== null && !state.skip) {
-      buffer += String.fromCharCode(num < 0 ? num + 65536 : num);
-      if (rtf[i] === '?') i++;
-    }
-  }
-  flush();
-  while (out.lastChild && out.lastChild.nodeName === 'BR') out.removeChild(out.lastChild);
-  return out.innerHTML;
-}
-function markExported() { baselineWords=countWords(textNow()); updateStats(); saveDocument(); }
-
-function renderRecents() {
-  const list = $('recentList'); list.innerHTML='';
-  const recent = [...documents].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,3);
-  if (!recent.length) { list.innerHTML='<div class="recent-empty">No recent documents</div>'; return; }
-  recent.forEach(doc => {
-    const btn=document.createElement('button'); btn.className='recent-btn'; btn.textContent=doc.title || 'Untitled';
-    if (doc.id === currentId) btn.setAttribute('aria-current','true');
-    btn.addEventListener('click', () => switchDocument(doc.id));
-    list.appendChild(btn);
-  });
-}
-function switchDocument(id) {
-  if (id === currentId) { closeDrawer(); return; }
-  saveDocument();
-  currentId=id; currentDoc=documents.find(d=>d.id===id);
-  if (!currentDoc) return;
-  docTitle.value=currentDoc.title || 'Untitled'; editor.innerHTML=currentDoc.html || '';
-  baselineWords=Number.isFinite(currentDoc.baselineWords) ? currentDoc.baselineWords : countWords(textNow());
-  sessionStartWords=countWords(textNow()); persistDocuments(); updateStats(); closeDrawer(); editor.focus();
-}
-function openDrawer() { $('drawer').classList.add('open'); $('drawer').setAttribute('aria-hidden','false'); $('scrim').hidden=false; renderRecents(); }
-function closeDrawer() { $('drawer').classList.remove('open'); $('drawer').setAttribute('aria-hidden','true'); $('scrim').hidden=true; }
-
-let lastVisibleHeight = 0;
-let viewportFrame = 0;
-let settleTimer = 0;
-
-function measureVisibleHeight() {
-  const viewport = window.visualViewport;
-  const measured = viewport ? viewport.height : window.innerHeight;
-  return Math.max(320, Math.round(measured));
+function insertFragment(frag){
+  editor.focus();restoreSelection();const s=window.getSelection();if(!s||!s.rangeCount)return;
+  const r=s.getRangeAt(0);r.deleteContents();const last=frag.lastChild;r.insertNode(frag);
+  if(last){r.setStartAfter(last);r.collapse(true);s.removeAllRanges();s.addRange(r);savedRange=r.cloneRange()}
+  updateStats();queueSave();
 }
 
-function applyVisibleHeight(force = false) {
-  viewportFrame = 0;
-  const nextHeight = measureVisibleHeight();
-
-  // Ignore the one- or two-pixel fluctuations iOS emits while the caret and
-  // selection handles are changing. Those tiny updates caused the old dock to
-  // appear to bob.
-  if (!force && Math.abs(nextHeight - lastVisibleHeight) < 4) return;
-
-  lastVisibleHeight = nextHeight;
-  document.documentElement.style.setProperty('--ww-visible-height', `${nextHeight}px`);
-
-  const keyboardOpen =
-    document.activeElement === editor &&
-    nextHeight < Math.round(window.screen.height * 0.82);
-
-  document.body.classList.toggle('keyboard-open', keyboardOpen);
+function safeName(ext){return `${titleNow().replace(/[\\/:*?"<>|]+/g,'-').slice(0,80)}.${ext}`}
+function download(content,type,name){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function rtfEsc(t){return Array.from(t).map(ch=>{const c=ch.codePointAt(0);if('\\{}'.includes(ch))return'\\'+ch;if(ch==='\n')return'\\par\n';if(c>127)return`\\u${c>32767?c-65536:c}?`;return ch}).join('')}
+function htmlToRtf(node){
+  if(node.nodeType===Node.TEXT_NODE)return rtfEsc(node.nodeValue||'');
+  if(node.nodeType!==Node.ELEMENT_NODE)return'';
+  const tag=node.tagName.toLowerCase(),inner=[...node.childNodes].map(htmlToRtf).join('');
+  if(tag==='br')return'\\line ';if(tag==='b'||tag==='strong')return`{\\b ${inner}}`;if(tag==='i'||tag==='em')return`{\\i ${inner}}`;if(['s','strike','del'].includes(tag))return`{\\strike ${inner}}`;if(tag==='p'||tag==='div')return`${inner}\\par\n`;return inner;
+}
+function parseRtf(raw){
+  return raw.replace(/\\par[d]?/g,'\n').replace(/\\line/g,'\n').replace(/\\u(-?\d+)\?/g,(_,n)=>String.fromCharCode(Number(n)<0?Number(n)+65536:Number(n))).replace(/\\'[0-9a-f]{2}/gi,'').replace(/\\[a-z]+-?\d* ?/gi,'').replace(/[{}]/g,'').trim().replace(/\n/g,'<br>');
+}
+async function importFile(file){
+  if(!file)return;const raw=await file.text();createDoc();currentDoc.title=file.name.replace(/\.(txt|rtf)$/i,'')||'Untitled';docTitle.value=currentDoc.title;
+  if(/\.rtf$/i.test(file.name)||/rtf/i.test(file.type))editor.innerHTML=parseRtf(raw);else editor.textContent=raw;
+  baselineWords=countWords(textNow());sessionStartWords=baselineWords;currentDoc.baselineWords=baselineWords;persist();updateStats();showEditor();
+}
+async function checkUpdates(manual=false){
+  const now=Date.now(),last=Number(localStorage.getItem(UPDATE_KEY)||0);if(!manual&&now-last<86400000)return;
+  $('latestVersion').textContent='Checking…';
+  try{const r=await fetch(`${VERSION_URL}?t=${now}`,{cache:'no-store'}),d=await r.json();$('latestVersion').textContent=d.version||APP_VERSION;localStorage.setItem(UPDATE_KEY,String(now));if(manual)alert((d.version||APP_VERSION)===APP_VERSION?`WarmWrite ${APP_VERSION} is up to date.`:`WarmWrite ${d.version} is available.`)}
+  catch{$('latestVersion').textContent='Unable to check';if(manual)alert('WarmWrite could not check for updates.')}
 }
 
-function requestVisibleHeight(force = false) {
-  if (viewportFrame) cancelAnimationFrame(viewportFrame);
-  viewportFrame = requestAnimationFrame(() => applyVisibleHeight(force));
-}
+editor.addEventListener('input',()=>{updateStats();queueSave()});
+editor.addEventListener('keyup',rememberSelection);editor.addEventListener('mouseup',rememberSelection);editor.addEventListener('touchend',rememberSelection);
+editor.addEventListener('paste',e=>{e.preventDefault();rememberSelection();const h=e.clipboardData?.getData('text/html'),t=e.clipboardData?.getData('text/plain')||'';if(h)insertFragment(cleanPastedHtml(h));else{const f=document.createDocumentFragment();t.replace(/\r\n?/g,'\n').split('\n').forEach((line,i,a)=>{f.appendChild(document.createTextNode(line));if(i<a.length-1)f.appendChild(document.createElement('br'))});insertFragment(f)}});
+docTitle.addEventListener('input',queueSave);
+document.querySelectorAll('[data-cmd]').forEach(b=>{b.addEventListener('pointerdown',e=>{rememberSelection();e.preventDefault()});b.addEventListener('click',()=>applyCommand(b.dataset.cmd))});
 
-function settleVisibleHeight() {
-  clearTimeout(settleTimer);
-  settleTimer = setTimeout(() => requestVisibleHeight(true), 120);
-}
+$('menuBtn').onclick=openDrawer;$('closeDrawerBtn').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
+$('settingsBtn').onclick=()=>$('settingsDialog').showModal();$('helpBtn').onclick=()=>$('helpDialog').showModal();$('focusBtn').onclick=()=>setFocus(!focusMode);
+$('closeFileBtn').onclick=showHome;$('newFileBtn').onclick=()=>{createDoc();showEditor();closeDrawer();editor.focus()};
+$('openInput').onchange=e=>{importFile(e.target.files?.[0]);e.target.value=''};
+$('homeImportInput').onchange=e=>{importFile(e.target.files?.[0]);e.target.value=''};
+$('homeNewBtn').onclick=()=>{createDoc();showEditor();editor.focus()};$('homeSettingsBtn').onclick=()=>$('settingsDialog').showModal();
+$('continueBtn').onclick=()=>{switchDoc($('continueBtn').dataset.id);showEditor()};
+$('exportBtn').onclick=()=>$('exportDialog').showModal();
+$('exportTxtBtn').onclick=e=>{e.preventDefault();download(textNow(),'text/plain;charset=utf-8',safeName('txt'));baselineWords=countWords(textNow());persist();updateStats();$('exportDialog').close()};
+$('exportRtfBtn').onclick=e=>{e.preventDefault();const body=[...editor.childNodes].map(htmlToRtf).join('');download(`{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\f0\\fs24\n${body}\n}`,'application/rtf',safeName('rtf'));baselineWords=countWords(textNow());persist();updateStats();$('exportDialog').close()};
+$('hideKeyboardBtn').onclick=()=>editor.blur();$('statsBtn').onclick=()=>{$('statsWords').textContent=countWords(textNow());$('statsChars').textContent=textNow().length;$('statsSession').textContent=countWords(textNow())-sessionStartWords;$('statsDialog').showModal()};
+$('fontSelect').onchange=e=>{settings.font=e.target.value;saveJSON(SETTINGS_KEY,settings);applySettings()};
+$('formatToggle').onchange=e=>{settings.formatting=e.target.checked;saveJSON(SETTINGS_KEY,settings);applySettings()};
+$('symbolsToggle').onchange=e=>{settings.symbolsBar=e.target.checked;saveJSON(SETTINGS_KEY,settings);applySettings()};
+$('symbolsInput').onchange=e=>{settings.symbols=e.target.value||DEFAULT_SYMBOLS;saveJSON(SETTINGS_KEY,settings);applySettings()};
+$('reminderToggle').onchange=e=>{settings.reminder=e.target.checked;saveJSON(SETTINGS_KEY,settings);updateStats()};
+$('thresholdSelect').onchange=e=>{settings.threshold=Number(e.target.value);saveJSON(SETTINGS_KEY,settings);updateStats()};
+$('autoUpdateToggle').onchange=e=>{settings.autoUpdate=e.target.checked;saveJSON(SETTINGS_KEY,settings)};
+$('checkUpdatesBtn').onclick=e=>{e.preventDefault();checkUpdates(true)};
 
-if (window.visualViewport) {
-  // Deliberately listen to resize only. visualViewport.scroll fires repeatedly
-  // as Safari adjusts the caret and is the main source of apparent bobbing.
-  window.visualViewport.addEventListener('resize', () => {
-    requestVisibleHeight();
-    settleVisibleHeight();
-  });
-}
-
-window.addEventListener('resize', () => {
-  requestVisibleHeight();
-  settleVisibleHeight();
-});
-
-window.addEventListener('orientationchange', () => {
-  setTimeout(() => requestVisibleHeight(true), 180);
-});
-
-editor.addEventListener('focus', () => {
-  requestVisibleHeight(true);
-  settleVisibleHeight();
-});
-
-editor.addEventListener('blur', () => {
-  setTimeout(() => requestVisibleHeight(true), 140);
-});
-
-reminderToggle.checked=settings.reminder; formattingToggle.checked=settings.formatting;
-symbolsToggle.checked=settings.symbolsBar; autoUpdateToggle.checked=settings.autoUpdate;
-thresholdSelect.value=String(settings.threshold); symbolsInput.value=settings.symbols;
-$('currentVersionText').textContent=APP_VERSION;
-refreshSymbols(); applyBarVisibility(); loadCurrentDocument(); requestVisibleHeight(true);
-showUpdatedMessageIfNeeded();
-if (settings.autoUpdate) setTimeout(() => checkForUpdates(false), 900);
-
-editor.addEventListener('input',()=>{ updateStats(); queueAutosave(); });
-editor.addEventListener('keyup',rememberSelection); editor.addEventListener('mouseup',rememberSelection); editor.addEventListener('touchend',rememberSelection);
-docTitle.addEventListener('input',()=>{ currentDoc.title=titleNow(); currentDoc.updatedAt=Date.now(); renderRecents(); queueAutosave(); });
-
-document.querySelectorAll('[data-cmd]').forEach(btn => {
-  btn.addEventListener('pointerdown', e => {
-    rememberSelection();
-    e.preventDefault();
-  });
-  btn.addEventListener('touchstart', () => rememberSelection(), {passive:true});
-  btn.addEventListener('click',()=>applyCommand(btn.dataset.cmd));
-});
-document.addEventListener('selectionchange', () => {
-  const selection = window.getSelection();
-  if (selection && selection.rangeCount && editor.contains(selection.anchorNode)) rememberSelection();
-});
-$('undoBtn').addEventListener('click',()=>applyCommand('undo'));
-$('redoBtn').addEventListener('click',()=>applyCommand('redo'));
-$('hideKeyboardBtn').addEventListener('click',()=>editor.blur());
-
-$('menuBtn').addEventListener('click',openDrawer); $('closeDrawer').addEventListener('click',closeDrawer); $('scrim').addEventListener('click',closeDrawer);
-$('exportBtn').addEventListener('click',()=>$('exportDialog').showModal());
-$('moreBtn').addEventListener('click',()=>$('settingsDialog').showModal());
-$('settingsBtn').addEventListener('click',()=>{ closeDrawer(); $('settingsDialog').showModal(); });
-$('aboutBtn').addEventListener('click',()=>{ closeDrawer(); $('aboutDialog').showModal(); });
-$('statsBtn').addEventListener('click',showStats);
-
-$('exportTxtBtn').addEventListener('click',e=>{ e.preventDefault(); download(textNow(),'text/plain;charset=utf-8',safeName('txt')); markExported(); $('exportDialog').close(); });
-$('exportRtfBtn').addEventListener('click',e=>{
-  e.preventDefault();
-  const body=Array.from(editor.childNodes).map(nodeToRtf).join('');
-  download(`{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}\\f0\\fs24\n${body}\n}`,'application/rtf',safeName('rtf'));
-  markExported(); $('exportDialog').close();
-});
-
-$('newDocBtn').addEventListener('click',()=>{
-  if (hasUnsavedWords() && !confirm('This document has unsaved words. Start a new document anyway?')) return;
-  saveDocument(); createBlankDocument(true); closeDrawer();
-});
-$('openDocument').addEventListener('change',async event=>{
-  const file=event.target.files?.[0]; if (!file) return;
-  if (hasUnsavedWords() && !confirm('This document has unsaved words. Open another document anyway?')) { event.target.value=''; return; }
-  try {
-    const raw=await file.text(), isRtf=/\.rtf$/i.test(file.name) || /rtf/i.test(file.type);
-    saveDocument();
-    const doc={id:uid(),title:file.name.replace(/\.(txt|rtf)$/i,'') || 'Untitled',html:isRtf ? parseRtf(raw) : '',baselineWords:0,updatedAt:Date.now()};
-    documents.push(doc); currentId=doc.id; currentDoc=doc; docTitle.value=doc.title;
-    if (isRtf) editor.innerHTML=doc.html; else editor.textContent=raw;
-    doc.html=editor.innerHTML; baselineWords=countWords(textNow()); doc.baselineWords=baselineWords; sessionStartWords=baselineWords;
-    persistDocuments(); updateStats(); saveDocument(); closeDrawer();
-  } catch { alert('WarmWrite could not open that document.'); }
-  event.target.value='';
-});
-
-formattingToggle.addEventListener('change',()=>{ settings.formatting=formattingToggle.checked; saveSettings(); applyBarVisibility(); });
-symbolsToggle.addEventListener('change',()=>{ settings.symbolsBar=symbolsToggle.checked; saveSettings(); applyBarVisibility(); });
-autoUpdateToggle.addEventListener('change',()=>{ settings.autoUpdate=autoUpdateToggle.checked; saveSettings(); });
-reminderToggle.addEventListener('change',()=>{ settings.reminder=reminderToggle.checked; saveSettings(); updateStats(); });
-thresholdSelect.addEventListener('change',()=>{ settings.threshold=Number(thresholdSelect.value); saveSettings(); updateStats(); });
-symbolsInput.addEventListener('change',()=>{ settings.symbols=symbolsInput.value || '— “ ” ‘ ’ … ( ) ? ! : ;'; saveSettings(); refreshSymbols(); });
-
-$('checkUpdatesBtn').addEventListener('click', e => { e.preventDefault(); checkForUpdates(true); });
-$('settingsUpdateBtn').addEventListener('click', e => { e.preventDefault(); installUpdate(); });
-$('updateNowBtn').addEventListener('click', e => { e.preventDefault(); installUpdate(); });
-$('laterSettingsBtn').addEventListener('click', e => {
-  e.preventDefault();
-  if (availableVersion) {
-    localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
-    localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(Date.now()));
-  }
-  $('updateDialog').close();
-});
-$('closeUpdateBtn').addEventListener('click', () => {
-  if (availableVersion) {
-    localStorage.setItem(DISMISSED_UPDATE_KEY, availableVersion);
-    localStorage.setItem(UPDATE_CHECKED_AT_KEY, String(Date.now()));
-  }
-  $('updateDialog').close();
-});
-
-$('resetSettingsBtn').addEventListener('click',e=>{
-  e.preventDefault();
-  if (!confirm('Reset WarmWrite and remove all locally stored documents?')) return;
-  localStorage.removeItem(OLD_DOC_KEY); localStorage.removeItem(DOCS_KEY); localStorage.removeItem(CURRENT_KEY); localStorage.removeItem(SETTINGS_KEY); location.reload();
-});
-window.addEventListener('beforeunload',saveDocument);
-if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
+loadCurrent();applySettings();renderRecents();renderHome();if(settings.autoUpdate)setTimeout(()=>checkUpdates(false),800);
+window.addEventListener('beforeunload',persist);
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 })();

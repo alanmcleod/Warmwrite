@@ -1,44 +1,5 @@
-const CACHE = 'warmwrite-v1-6';
-const ASSETS = [
-  './','./index.html','./style.css','./app.js','./manifest.webmanifest',
-  './version.json','./icon.svg','./icons/apple-touch-icon.png',
-  './icons/favicon.png','./icons/icon-192.png','./icons/icon-512.png'
-];
-
-self.addEventListener('install', event => {
-  self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(Promise.all([
-    self.clients.claim(),
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE).map(key => caches.delete(key))
-    ))
-  ]));
-});
-
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-
-  const url = new URL(event.request.url);
-  if (url.pathname.endsWith('/version.json')) {
-    event.respondWith(fetch(event.request, {cache:'no-store'}));
-    return;
-  }
-
-  event.respondWith(
-    fetch(event.request).then(response => {
-      const copy = response.clone();
-      caches.open(CACHE).then(cache => cache.put(event.request, copy));
-      return response;
-    }).catch(() => caches.match(event.request).then(
-      cached => cached || caches.match('./index.html')
-    ))
-  );
-});
-
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
-});
+const CACHE='warmwrite-v2-0';
+const ASSETS=['./','./index.html','./style.css','./app.js','./manifest.webmanifest','./version.json','./icon.svg','./icons/apple-touch-icon.png','./icons/favicon.png','./icons/icon-192.png','./icons/icon-512.png'];
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
+self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))])));
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(u.pathname.endsWith('/version.json')){e.respondWith(fetch(e.request,{cache:'no-store'}));return}e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(c=>c||caches.match('./index.html'))))});
