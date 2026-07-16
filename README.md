@@ -1,4 +1,4 @@
-# WarmWrite 2.0
+# WarmWrite 2.0.1
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -32,3 +32,9 @@ Open the live app in Safari → Share → **Add to Home Screen** → leave **Ope
 
 ### Android
 Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app**.
+
+## Version 2.0.1
+
+- Restores the iPhone and mobile keyboard viewport fix.
+- Keeps all enabled lower controls above the keyboard.
+- Prevents visible toolbar bobbing from tiny iOS viewport fluctuations.

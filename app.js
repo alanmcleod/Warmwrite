@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.0';
+const APP_VERSION='2.0.1';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -224,6 +224,71 @@ $('thresholdSelect').onchange=e=>{settings.threshold=Number(e.target.value);save
 $('autoUpdateToggle').onchange=e=>{settings.autoUpdate=e.target.checked;saveJSON(SETTINGS_KEY,settings)};
 $('checkUpdatesBtn').onclick=e=>{e.preventDefault();checkUpdates(true)};
 
+
+let viewportFrame=0,viewportSettleTimer=0,lastViewportHeight=0,lastViewportTop=0;
+
+function measureViewport(){
+  const vv=window.visualViewport;
+  return {
+    height:Math.max(320,Math.round(vv?vv.height:window.innerHeight)),
+    top:Math.round(vv?vv.offsetTop:0)
+  };
+}
+
+function applyViewport(force=false){
+  viewportFrame=0;
+  const next=measureViewport();
+
+  // Ignore tiny iOS caret/selection fluctuations, which otherwise make the
+  // complete lower dock appear to bob while typing.
+  const heightChanged=Math.abs(next.height-lastViewportHeight)>=4;
+  const topChanged=Math.abs(next.top-lastViewportTop)>=4;
+  if(!force&&!heightChanged&&!topChanged)return;
+
+  lastViewportHeight=next.height;
+  lastViewportTop=next.top;
+  document.documentElement.style.setProperty('--ww-visible-height',`${next.height}px`);
+  document.documentElement.style.setProperty('--ww-visible-top',`${next.top}px`);
+}
+
+function requestViewport(force=false){
+  if(viewportFrame)cancelAnimationFrame(viewportFrame);
+  viewportFrame=requestAnimationFrame(()=>applyViewport(force));
+}
+
+function settleViewport(){
+  clearTimeout(viewportSettleTimer);
+  viewportSettleTimer=setTimeout(()=>requestViewport(true),120);
+}
+
+if(window.visualViewport){
+  // Resize is enough to detect the keyboard. Listening to visualViewport.scroll
+  // causes repeated small movements as Safari follows the caret.
+  window.visualViewport.addEventListener('resize',()=>{
+    requestViewport();
+    settleViewport();
+  });
+}
+
+window.addEventListener('resize',()=>{
+  requestViewport();
+  settleViewport();
+});
+
+window.addEventListener('orientationchange',()=>{
+  setTimeout(()=>requestViewport(true),180);
+});
+
+editor.addEventListener('focus',()=>{
+  requestViewport(true);
+  settleViewport();
+});
+
+editor.addEventListener('blur',()=>{
+  setTimeout(()=>requestViewport(true),140);
+});
+
+requestViewport(true);
 loadCurrent();applySettings();renderRecents();renderHome();if(settings.autoUpdate)setTimeout(()=>checkUpdates(false),800);
 window.addEventListener('beforeunload',persist);
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));

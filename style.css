@@ -59,3 +59,60 @@ body.focus-mode .editor{padding-bottom:30px!important}
 .help-copy p{line-height:1.45;margin:0;padding:12px 0;border-bottom:1px solid var(--line)}
 body.home-open .workspace{display:none}body.home-open .home-screen{display:block!important}body.home-open #menuBtn,body.home-open #focusBtn,body.home-open #docTitle,body.home-open #saveStatus{visibility:hidden}
 @media(min-width:760px){.app-shell{max-width:1100px;margin:0 auto;box-shadow:var(--shadow)}.editor{padding-inline:min(12vw,120px)}}
+
+
+/* WarmWrite 2.0.1 — keep lower controls above mobile keyboards */
+:root {
+  --ww-visible-height: 100dvh;
+  --ww-visible-top: 0px;
+}
+
+html,
+body {
+  width: 100%;
+  height: var(--ww-visible-height);
+  min-height: 0;
+  overflow: hidden;
+}
+
+body {
+  position: fixed;
+  top: var(--ww-visible-top);
+  left: 0;
+  right: 0;
+  bottom: auto;
+}
+
+.app-shell {
+  height: var(--ww-visible-height);
+  min-height: 0;
+  max-height: var(--ww-visible-height);
+}
+
+.workspace {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+.editor-wrap,
+.editor {
+  min-height: 0;
+}
+
+.statusbar,
+.symbol-bar,
+.format-bar {
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto !important;
+  overflow-anchor: none;
+}
+
+@supports (height: 100svh) {
+  :root {
+    --ww-visible-height: 100svh;
+  }
+}

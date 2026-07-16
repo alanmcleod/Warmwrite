@@ -1,12 +1,9 @@
 {
-  "version": "2.0",
+  "version": "2.0.1",
   "notes": [
-    "Continue Writing home screen",
-    "Close File",
-    "Focus Mode with colour save reminder retained",
-    "Classic or Modern global font",
-    "Help and Settings controls in title bar",
-    "Pasted text cleaned and standardised",
-    "New editable Quick Symbols defaults"
+    "Keeps word count, Quick Symbols and formatting bars above mobile keyboards",
+    "Moves enabled lower controls as one stable dock",
+    "Ignores tiny iOS viewport changes to prevent bobbing",
+    "Retains all WarmWrite 2.0 features"
   ]
 }
