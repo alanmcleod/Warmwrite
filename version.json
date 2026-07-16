@@ -1,10 +1,9 @@
 {
-  "version": "2.0.2",
+  "version": "2.0.3",
   "notes": [
-    "Save / Share menu replaces the old Export label",
-    "Share as RTF uses the device share sheet where supported",
-    "Print opens the normal system print dialog",
-    "Falls back to saving an RTF file when sharing is unavailable",
-    "Retains the mobile keyboard dock fix"
+    "Print uses an invisible temporary frame",
+    "The WarmWrite editor is no longer replaced by the print page",
+    "The temporary print frame removes itself after printing",
+    "Retains Save / Share and the mobile keyboard dock fix"
   ]
 }

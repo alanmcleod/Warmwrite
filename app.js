@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.0.2';
+const APP_VERSION='2.0.3';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -199,21 +199,90 @@ async function shareRtf(){
 }
 function printDocument(){
   persist();
-  const w=window.open('','_blank');
-  if(!w){alert('Please allow pop-ups for WarmWrite to print.');return}
-  const font=settings.font==='modern'?'Arial, Helvetica, sans-serif':'"Times New Roman", Times, serif';
-  w.document.open();
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title></title><style>
-  @page{margin:20mm}body{margin:0;color:#111;background:white;font-family:${font};font-size:12pt;line-height:1.5}
-  h1{font-size:18pt;margin:0 0 18pt}.document{overflow-wrap:anywhere}
-  </style></head><body><h1></h1><div class="document"></div></body></html>`);
-  w.document.close();
-  w.document.title=titleNow();
-  w.document.querySelector('h1').textContent=titleNow();
-  w.document.querySelector('.document').innerHTML=editor.innerHTML;
-  const run=()=>{w.focus();w.print()};
-  if(w.document.readyState==='complete')setTimeout(run,150);
-  else w.addEventListener('load',()=>setTimeout(run,150),{once:true});
+
+  const existing=document.getElementById('warmwritePrintFrame');
+  if(existing) existing.remove();
+
+  const frame=document.createElement('iframe');
+  frame.id='warmwritePrintFrame';
+  frame.setAttribute('aria-hidden','true');
+  frame.style.position='fixed';
+  frame.style.width='1px';
+  frame.style.height='1px';
+  frame.style.right='0';
+  frame.style.bottom='0';
+  frame.style.border='0';
+  frame.style.opacity='0';
+  frame.style.pointerEvents='none';
+
+  document.body.appendChild(frame);
+
+  const printDoc=frame.contentDocument || frame.contentWindow.document;
+  const font=settings.font==='modern'
+    ? 'Arial, Helvetica, sans-serif'
+    : '"Times New Roman", Times, serif';
+
+  printDoc.open();
+  printDoc.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title></title>
+<style>
+  @page { margin: 20mm; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    color: #111;
+    background: white;
+    font-family: ${font};
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+  h1 {
+    font-size: 18pt;
+    margin: 0 0 18pt;
+  }
+  .document {
+    overflow-wrap: anywhere;
+  }
+  p, div {
+    break-inside: avoid;
+  }
+</style>
+</head>
+<body>
+<h1></h1>
+<div class="document"></div>
+</body>
+</html>`);
+  printDoc.close();
+
+  printDoc.title=titleNow();
+  printDoc.querySelector('h1').textContent=titleNow();
+  printDoc.querySelector('.document').innerHTML=editor.innerHTML;
+
+  let removed=false;
+  const removeFrame=()=>{
+    if(removed) return;
+    removed=true;
+    setTimeout(()=>frame.remove(),250);
+  };
+
+  const printWindow=frame.contentWindow;
+  printWindow.addEventListener('afterprint',removeFrame,{once:true});
+
+  setTimeout(()=>{
+    try{
+      printWindow.focus();
+      printWindow.print();
+      // iOS does not always emit afterprint.
+      setTimeout(removeFrame,3000);
+    }catch{
+      removeFrame();
+      alert('WarmWrite could not open the print dialogue.');
+    }
+  },180);
 }
 function rtfEsc(t){return Array.from(t).map(ch=>{const c=ch.codePointAt(0);if('\\{}'.includes(ch))return'\\'+ch;if(ch==='\n')return'\\par\n';if(c>127)return`\\u${c>32767?c-65536:c}?`;return ch}).join('')}
 function htmlToRtf(node){

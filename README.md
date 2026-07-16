@@ -1,4 +1,4 @@
-# WarmWrite 2.0.2
+# WarmWrite 2.0.3
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -45,3 +45,9 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 - Adds **Share as RTF** using the device share menu.
 - Adds **Print** using the normal iOS, Android or desktop print dialog.
 - Falls back to downloading an RTF copy if file sharing is unsupported.
+
+## Version 2.0.3
+
+- Fixes printing on iPhone and installed web apps.
+- Printing now uses a temporary invisible frame.
+- The editor remains open and unchanged after the print dialogue closes.
