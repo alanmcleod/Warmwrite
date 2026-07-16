@@ -1,9 +1,12 @@
 {
-  "version": "2.0.3",
+  "version": "2.1.0",
   "notes": [
-    "Print uses an invisible temporary frame",
-    "The WarmWrite editor is no longer replaced by the print page",
-    "The temporary print frame removes itself after printing",
-    "Retains Save / Share and the mobile keyboard dock fix"
+    "Total words and words this session are displayed on separate lines",
+    "Focus Mode no longer dismisses an open mobile keyboard",
+    "Focus Mode uses a calmer reading layout when the keyboard is dismissed",
+    "Home shows up to ten recent documents and can reveal the full local list",
+    "Document entries show last-edited time and word count",
+    "WarmWrite warns about storage pressure and never automatically deletes documents",
+    "Retains Save / Share, printing fix and mobile keyboard dock fix"
   ]
 }

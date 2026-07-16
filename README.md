@@ -1,4 +1,4 @@
-# WarmWrite 2.0.3
+# WarmWrite 2.1.0
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -51,3 +51,12 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 - Fixes printing on iPhone and installed web apps.
 - Printing now uses a temporary invisible frame.
 - The editor remains open and unchanged after the print dialogue closes.
+
+## Version 2.1.0
+
+- Restores the two-line total/session word display.
+- Keeps the keyboard and cursor active when Focus Mode is toggled during writing.
+- Gives Focus Mode a reading-friendly layout after the keyboard is dismissed.
+- Shows up to ten recent documents and adds **Show all documents**.
+- Shows last-edited times and word counts in the document list.
+- Warns about storage pressure and never automatically purges documents.

@@ -48,7 +48,9 @@
 
       <section class="home-section">
         <div class="home-label">Recent Documents</div>
+        <div id="storageNotice" class="storage-notice" hidden></div>
         <div id="homeRecent"></div>
+        <button id="showAllDocsBtn" class="show-all-btn" hidden>Show all documents</button>
       </section>
 
       <div class="home-actions">
@@ -65,7 +67,7 @@
     </section>
 
     <div id="statusBar" class="statusbar">
-      <button id="statsBtn" class="stats-btn"><span id="wordCount">0</span> words <span id="sessionCount">+0 this session</span></button>
+      <button id="statsBtn" class="stats-btn"><span class="total-count"><span id="wordCount">0</span> words</span><span id="sessionCount" class="session-count">+0 this session</span></button>
       <span class="unsaved"><span class="dot"></span><span id="unsavedCount">0</span> unsaved</span>
       <button id="exportBtn" class="export-btn">Save / Share</button>
     </div>
@@ -135,7 +137,7 @@
 
     <section class="updates-section">
       <h3>Updates</h3>
-      <div class="stat-row"><span>Current version</span><strong>2.0</strong></div>
+      <div class="stat-row"><span>Current version</span><strong>2.1.0</strong></div>
       <div class="stat-row"><span>Latest version</span><strong id="latestVersion">Not checked</strong></div>
       <label class="setting-row">
         <span><strong>Automatically check</strong><small>At most once per day.</small></span>
@@ -151,10 +153,10 @@
     <div class="dialog-head"><strong>WarmWrite Quick Guide</strong><button value="cancel" class="icon-btn">×</button></div>
     <div class="help-copy">
       <p><strong>Start writing</strong><br>Create or open a document, tap the page and type.</p>
-      <p><strong>Continue Writing</strong><br>Close a file to return to the Home screen. Your latest document appears first.</p>
+      <p><strong>Continue Writing</strong><br>Close a file to return to the Home screen. Your latest document appears first, and Show all documents reveals the complete local list.</p>
       <p><strong>Word count</strong><br>Your total and session word counts appear below the page.</p>
       <p><strong>Save reminder</strong><br>The page can gradually change from cream towards orange as unexported changes accumulate.</p>
-      <p><strong>Focus Mode</strong><br>Tap “Focus is Off” to hide the lower bars. The colour reminder remains active.</p>
+      <p><strong>Focus Mode</strong><br>Tap “Focus is Off” to hide WarmWrite’s lower bars without dismissing the keyboard. Dismiss the keyboard yourself for a calmer reading layout.</p>
       <p><strong>Open formats</strong><br>WarmWrite opens and exports TXT and simple RTF documents.</p>
       <p><strong>Privacy</strong><br>Your documents stay in this browser unless you export them.</p>
     </div>

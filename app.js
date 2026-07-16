@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.0.3';
+const APP_VERSION='2.1.0';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -13,11 +13,21 @@ const $=id=>document.getElementById(id);
 const editor=$('editor'), editorWrap=$('editorWrap'), docTitle=$('docTitle'), saveStatus=$('saveStatus');
 let docs=loadJSON(DOCS_KEY,[]);
 let currentId=localStorage.getItem(CURRENT_KEY)||'';
-let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, savedRange=null, focusMode=false;
+let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, savedRange=null, focusMode=false,showAllDocs=false,focusRestoreKeyboard=false;
 let settings={reminder:true,threshold:300,formatting:false,symbolsBar:true,symbols:DEFAULT_SYMBOLS,font:'classic',autoUpdate:true,...loadJSON(SETTINGS_KEY,{})};
 
 function loadJSON(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}}
-function saveJSON(key,val){localStorage.setItem(key,JSON.stringify(val))}
+function saveJSON(key,val){
+  try{
+    localStorage.setItem(key,JSON.stringify(val));
+    return true;
+  }catch(err){
+    saveStatus.textContent='Storage full';
+    showStorageNotice(true);
+    alert('WarmWrite could not save this change because local storage is full. No documents were deleted. Please export important work and remove files yourself.');
+    return false;
+  }
+}
 function uid(){return `${Date.now()}-${Math.random().toString(36).slice(2,8)}`}
 function countWords(t){const s=t.trim();return s?s.split(/\s+/u).length:0}
 function textNow(){return editor.innerText.replace(/\u00a0/g,' ')}
@@ -48,10 +58,13 @@ function persist(){
   currentDoc.baselineWords=baselineWords;
   currentDoc.updatedAt=Date.now();
   docs.sort((a,b)=>b.updatedAt-a.updatedAt);
-  saveJSON(DOCS_KEY,docs);
-  localStorage.setItem(CURRENT_KEY,currentId);
-  saveStatus.textContent='✓ Saved';
+  const saved=saveJSON(DOCS_KEY,docs);
+  if(saved){
+    localStorage.setItem(CURRENT_KEY,currentId);
+    saveStatus.textContent='✓ Saved';
+  }
   renderRecents();
+  checkStorage();
 }
 function queueSave(){saveStatus.textContent='Saving…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,300)}
 function createDoc(){
@@ -103,36 +116,102 @@ function updateStats(){
   }
   editorWrap.style.backgroundColor=c;editor.style.backgroundColor=c;
 }
-function setFocus(on){
-  focusMode=!!on;document.body.classList.toggle('focus-mode',focusMode);
+function keyboardIsOpen(){
+  const vv=window.visualViewport;
+  if(!vv)return document.activeElement===editor;
+  return window.innerHeight-vv.height>110;
+}
+function updateReadingLayout(){
+  const reading=focusMode&&!keyboardIsOpen();
+  document.body.classList.toggle('reading-layout',reading);
+}
+function setFocus(on,restoreKeyboard=false){
+  focusMode=!!on;
+  document.body.classList.toggle('focus-mode',focusMode);
   $('focusBtn').textContent=focusMode?'Focus is On':'Focus is Off';
   $('focusBtn').setAttribute('aria-pressed',String(focusMode));
+  updateReadingLayout();
+  if(restoreKeyboard){
+    requestAnimationFrame(()=>{
+      try{editor.focus({preventScroll:true})}catch{editor.focus()}
+      restoreSelection();
+      updateReadingLayout();
+    });
+  }
 }
 function showHome(){
   persist();setFocus(false);document.body.classList.add('home-open');$('homeScreen').hidden=false;renderHome();closeDrawer();
 }
 function showEditor(){document.body.classList.remove('home-open');$('homeScreen').hidden=true}
+function documentWordCount(d){
+  const tmp=document.createElement('div');
+  tmp.innerHTML=d.html||'';
+  return countWords(tmp.innerText||'');
+}
+function showStorageNotice(force=false){
+  const notice=$('storageNotice');
+  if(!notice)return;
+  if(force){
+    notice.hidden=false;
+    notice.textContent='Local storage is nearly full. WarmWrite will never delete old documents automatically. Export important work and choose any files you wish to remove.';
+  }else if(!notice.dataset.storageWarning){
+    notice.hidden=true;
+  }
+}
+async function checkStorage(){
+  let localChars=0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i)||'';
+      localChars+=key.length+(localStorage.getItem(key)||'').length;
+    }
+  }catch{}
+  const localBytes=localChars*2;
+  let warn=localBytes>4*1024*1024;
+  if(navigator.storage&&navigator.storage.estimate){
+    try{
+      const estimate=await navigator.storage.estimate();
+      if(estimate.quota&&estimate.usage/estimate.quota>.8)warn=true;
+    }catch{}
+  }
+  const notice=$('storageNotice');
+  if(notice){
+    notice.dataset.storageWarning=warn?'true':'';
+    notice.hidden=!warn;
+    if(warn)notice.textContent='Local storage is getting full. WarmWrite will not purge old documents. Export important work and delete only the documents you choose.';
+  }
+}
 function renderHome(){
   const sorted=[...docs].sort((a,b)=>b.updatedAt-a.updatedAt),latest=sorted[0],card=$('continueCard');
   if(latest){
-    card.hidden=false;$('continueTitle').textContent=latest.title||'Untitled';
-    const tmp=document.createElement('div');tmp.innerHTML=latest.html||'';
-    $('continueMeta').textContent=`${countWords(tmp.innerText||'').toLocaleString('en-GB')} words · Last edited ${formatDate(latest.updatedAt)}`;
+    card.hidden=false;
+    $('continueTitle').textContent=latest.title||'Untitled';
+    $('continueMeta').textContent=`${documentWordCount(latest).toLocaleString('en-GB')} words · Last edited ${formatDate(latest.updatedAt)}`;
     $('continueBtn').dataset.id=latest.id;
   }else card.hidden=true;
-  const list=$('homeRecent');list.innerHTML='';
-  sorted.slice(1,4).forEach(d=>{
-    const tmp=document.createElement('div');tmp.innerHTML=d.html||'';
-    const b=document.createElement('button');b.className='home-recent-btn';
+  const list=$('homeRecent');
+  list.innerHTML='';
+  const remaining=sorted.slice(1);
+  const visible=showAllDocs?remaining:remaining.slice(0,9);
+  visible.forEach(d=>{
+    const b=document.createElement('button');
+    b.className='home-recent-btn';
     const strong=document.createElement('strong'),small=document.createElement('small');
-    strong.textContent=d.title||'Untitled';small.textContent=`${countWords(tmp.innerText||'')} words · ${formatDate(d.updatedAt)}`;
-    b.append(strong,small);b.addEventListener('click',()=>{switchDoc(d.id);showEditor()});list.appendChild(b);
+    strong.textContent=d.title||'Untitled';
+    small.textContent=`Last edited ${formatDate(d.updatedAt)} · ${documentWordCount(d).toLocaleString('en-GB')} words`;
+    b.append(strong,small);
+    b.addEventListener('click',()=>{switchDoc(d.id);showEditor()});
+    list.appendChild(b);
   });
   if(!list.children.length)list.innerHTML='<div class="subtle">No other recent documents</div>';
+  const showBtn=$('showAllDocsBtn');
+  showBtn.hidden=remaining.length<=9;
+  showBtn.textContent=showAllDocs?'Show fewer documents':`Show all documents (${sorted.length})`;
+  checkStorage();
 }
 function renderRecents(){
   const list=$('drawerRecent');list.innerHTML='';
-  [...docs].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,3).forEach(d=>{
+  [...docs].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,8).forEach(d=>{
     const b=document.createElement('button');b.className='recent-btn';b.textContent=d.title||'Untitled';b.addEventListener('click',()=>switchDoc(d.id));list.appendChild(b);
   });
 }
@@ -313,12 +392,20 @@ docTitle.addEventListener('input',queueSave);
 document.querySelectorAll('[data-cmd]').forEach(b=>{b.addEventListener('pointerdown',e=>{rememberSelection();e.preventDefault()});b.addEventListener('click',()=>applyCommand(b.dataset.cmd))});
 
 $('menuBtn').onclick=openDrawer;$('closeDrawerBtn').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
-$('settingsBtn').onclick=()=>$('settingsDialog').showModal();$('helpBtn').onclick=()=>$('helpDialog').showModal();$('focusBtn').onclick=()=>setFocus(!focusMode);
+$('settingsBtn').onclick=()=>$('settingsDialog').showModal();
+$('helpBtn').onclick=()=>$('helpDialog').showModal();
+$('focusBtn').addEventListener('pointerdown',e=>{
+  focusRestoreKeyboard=keyboardIsOpen()||document.activeElement===editor;
+  rememberSelection();
+  if(focusRestoreKeyboard)e.preventDefault();
+});
+$('focusBtn').onclick=()=>setFocus(!focusMode,focusRestoreKeyboard);
 $('closeFileBtn').onclick=showHome;$('newFileBtn').onclick=()=>{createDoc();showEditor();closeDrawer();editor.focus()};
 $('openInput').onchange=e=>{importFile(e.target.files?.[0]);e.target.value=''};
 $('homeImportInput').onchange=e=>{importFile(e.target.files?.[0]);e.target.value=''};
 $('homeNewBtn').onclick=()=>{createDoc();showEditor();editor.focus()};$('homeSettingsBtn').onclick=()=>$('settingsDialog').showModal();
 $('continueBtn').onclick=()=>{switchDoc($('continueBtn').dataset.id);showEditor()};
+$('showAllDocsBtn').onclick=()=>{showAllDocs=!showAllDocs;renderHome()};
 $('exportBtn').onclick=()=>$('exportDialog').showModal();
 $('exportTxtBtn').onclick=e=>{e.preventDefault();download(textNow(),'text/plain;charset=utf-8',safeName('txt'));baselineWords=countWords(textNow());persist();updateStats();$('exportDialog').close()};
 $('exportRtfBtn').onclick=e=>{e.preventDefault();download(makeRtfContent(),'application/rtf',safeName('rtf'));baselineWords=countWords(textNow());persist();updateStats();$('exportDialog').close()};
@@ -359,6 +446,7 @@ function applyViewport(force=false){
   lastViewportTop=next.top;
   document.documentElement.style.setProperty('--ww-visible-height',`${next.height}px`);
   document.documentElement.style.setProperty('--ww-visible-top',`${next.top}px`);
+  updateReadingLayout();
 }
 
 function requestViewport(force=false){
@@ -395,11 +483,11 @@ editor.addEventListener('focus',()=>{
 });
 
 editor.addEventListener('blur',()=>{
-  setTimeout(()=>requestViewport(true),140);
+  setTimeout(()=>{requestViewport(true);updateReadingLayout()},140);
 });
 
 requestViewport(true);
-loadCurrent();applySettings();renderRecents();renderHome();if(settings.autoUpdate)setTimeout(()=>checkUpdates(false),800);
+loadCurrent();applySettings();renderRecents();renderHome();checkStorage();if(settings.autoUpdate)setTimeout(()=>checkUpdates(false),800);
 window.addEventListener('beforeunload',persist);
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 })();
