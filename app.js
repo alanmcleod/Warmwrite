@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.0.1';
+const APP_VERSION='2.0.2';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -176,6 +176,45 @@ function insertFragment(frag){
 
 function safeName(ext){return `${titleNow().replace(/[\\/:*?"<>|]+/g,'-').slice(0,80)}.${ext}`}
 function download(content,type,name){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function makeRtfContent(){
+  const body=[...editor.childNodes].map(htmlToRtf).join('');
+  return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\f0\\fs24\n${body}\n}`;
+}
+async function shareRtf(){
+  const file=new File([makeRtfContent()],safeName('rtf'),{type:'application/rtf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({title:titleNow(),text:`${titleNow()} — shared from WarmWrite`,files:[file]});
+      return;
+    }catch(err){if(err&&err.name==='AbortError')return}
+  }
+  if(navigator.share){
+    try{
+      await navigator.share({title:titleNow(),text:textNow()});
+      return;
+    }catch(err){if(err&&err.name==='AbortError')return}
+  }
+  download(makeRtfContent(),'application/rtf',safeName('rtf'));
+  alert('This browser could not open the share menu, so WarmWrite saved an RTF copy instead.');
+}
+function printDocument(){
+  persist();
+  const w=window.open('','_blank');
+  if(!w){alert('Please allow pop-ups for WarmWrite to print.');return}
+  const font=settings.font==='modern'?'Arial, Helvetica, sans-serif':'"Times New Roman", Times, serif';
+  w.document.open();
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title></title><style>
+  @page{margin:20mm}body{margin:0;color:#111;background:white;font-family:${font};font-size:12pt;line-height:1.5}
+  h1{font-size:18pt;margin:0 0 18pt}.document{overflow-wrap:anywhere}
+  </style></head><body><h1></h1><div class="document"></div></body></html>`);
+  w.document.close();
+  w.document.title=titleNow();
+  w.document.querySelector('h1').textContent=titleNow();
+  w.document.querySelector('.document').innerHTML=editor.innerHTML;
+  const run=()=>{w.focus();w.print()};
+  if(w.document.readyState==='complete')setTimeout(run,150);
+  else w.addEventListener('load',()=>setTimeout(run,150),{once:true});
+}
 function rtfEsc(t){return Array.from(t).map(ch=>{const c=ch.codePointAt(0);if('\\{}'.includes(ch))return'\\'+ch;if(ch==='\n')return'\\par\n';if(c>127)return`\\u${c>32767?c-65536:c}?`;return ch}).join('')}
 function htmlToRtf(node){
   if(node.nodeType===Node.TEXT_NODE)return rtfEsc(node.nodeValue||'');
@@ -213,7 +252,9 @@ $('homeNewBtn').onclick=()=>{createDoc();showEditor();editor.focus()};$('homeSet
 $('continueBtn').onclick=()=>{switchDoc($('continueBtn').dataset.id);showEditor()};
 $('exportBtn').onclick=()=>$('exportDialog').showModal();
 $('exportTxtBtn').onclick=e=>{e.preventDefault();download(textNow(),'text/plain;charset=utf-8',safeName('txt'));baselineWords=countWords(textNow());persist();updateStats();$('exportDialog').close()};
-$('exportRtfBtn').onclick=e=>{e.preventDefault();const body=[...editor.childNodes].map(htmlToRtf).join('');download(`{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\f0\\fs24\n${body}\n}`,'application/rtf',safeName('rtf'));baselineWords=countWords(textNow());persist();updateStats();$('exportDialog').close()};
+$('exportRtfBtn').onclick=e=>{e.preventDefault();download(makeRtfContent(),'application/rtf',safeName('rtf'));baselineWords=countWords(textNow());persist();updateStats();$('exportDialog').close()};
+$('shareRtfBtn').onclick=async e=>{e.preventDefault();await shareRtf();$('exportDialog').close()};
+$('printBtn').onclick=e=>{e.preventDefault();$('exportDialog').close();setTimeout(printDocument,80)};
 $('hideKeyboardBtn').onclick=()=>editor.blur();$('statsBtn').onclick=()=>{$('statsWords').textContent=countWords(textNow());$('statsChars').textContent=textNow().length;$('statsSession').textContent=countWords(textNow())-sessionStartWords;$('statsDialog').showModal()};
 $('fontSelect').onchange=e=>{settings.font=e.target.value;saveJSON(SETTINGS_KEY,settings);applySettings()};
 $('formatToggle').onchange=e=>{settings.formatting=e.target.checked;saveJSON(SETTINGS_KEY,settings);applySettings()};

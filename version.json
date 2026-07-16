@@ -1,9 +1,10 @@
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "notes": [
-    "Keeps word count, Quick Symbols and formatting bars above mobile keyboards",
-    "Moves enabled lower controls as one stable dock",
-    "Ignores tiny iOS viewport changes to prevent bobbing",
-    "Retains all WarmWrite 2.0 features"
+    "Save / Share menu replaces the old Export label",
+    "Share as RTF uses the device share sheet where supported",
+    "Print opens the normal system print dialog",
+    "Falls back to saving an RTF file when sharing is unavailable",
+    "Retains the mobile keyboard dock fix"
   ]
 }

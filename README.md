@@ -1,4 +1,4 @@
-# WarmWrite 2.0.1
+# WarmWrite 2.0.2
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -38,3 +38,10 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 - Restores the iPhone and mobile keyboard viewport fix.
 - Keeps all enabled lower controls above the keyboard.
 - Prevents visible toolbar bobbing from tiny iOS viewport fluctuations.
+
+## Version 2.0.2
+
+- Renames Export to **Save / Share**.
+- Adds **Share as RTF** using the device share menu.
+- Adds **Print** using the normal iOS, Android or desktop print dialog.
+- Falls back to downloading an RTF copy if file sharing is unsupported.
