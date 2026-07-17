@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.2.1';
+const APP_VERSION='2.2.3';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -150,7 +150,8 @@ function updateReadingPage(){
   if(!pages||!viewport)return;
   readingPage=Math.max(0,Math.min(readingPage,Math.max(0,readingPageCount-1)));
   pages.style.transform=`translateX(${-readingPage*viewport.clientWidth}px)`;
-  $('readingPageNumber').textContent=`${readingPage+1} of ${readingPageCount}`;
+  const readingPercent=readingPageCount<=1?100:Math.round(((readingPage+1)/readingPageCount)*100);
+  $('readingPageNumber').textContent=`${readingPercent}%`;
 }
 function prepareReadingColumns(){
   const pages=$('readingPages'),viewport=$('readingViewport');
@@ -171,7 +172,7 @@ function paginateReading(keepProgress=true){
   const width=prepareReadingColumns();
   pages.style.transform='translateX(0)';
   requestAnimationFrame(()=>{
-    readingPageCount=Math.max(1,Math.round(pages.scrollWidth/width));
+    readingPageCount=Math.max(1,Math.ceil((pages.scrollWidth-1)/width));
     if(keepProgress)readingPage=Math.round(oldProgress*Math.max(0,readingPageCount-1));
     updateReadingPage();
   });
@@ -199,7 +200,7 @@ function enterReadingMode(){
     const max=Math.max(1,editor.scrollHeight-editor.clientHeight);
     const progress=Math.max(0,Math.min(1,writingScrollTop/max));
     const width=prepareReadingColumns();
-    readingPageCount=Math.max(1,Math.round(pages.scrollWidth/width));
+    readingPageCount=Math.max(1,Math.ceil((pages.scrollWidth-1)/width));
     readingPage=Math.round(progress*Math.max(0,readingPageCount-1));
     updateReadingPage();
   });

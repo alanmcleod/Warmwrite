@@ -1,9 +1,10 @@
 {
-  "version": "2.2.1",
+  "version": "2.2.3",
   "notes": [
-    "Fixes overlapping and clipped columns in iPhone Reading Mode",
-    "Each page now uses the visible screen width with correct inner margins",
-    "Writing mode and existing editor behaviour are unchanged",
-    "Retains instant page changes, pen return control and reading text-size controls"
+    "Reading Mode progress is shown as a percentage instead of screen-page numbers",
+    "Fixes blank pages when moving forward in Reading Mode",
+    "Allows off-screen reading columns to remain available for page navigation",
+    "Uses safer page-count rounding",
+    "Writing mode remains unchanged"
   ]
 }

@@ -1,4 +1,4 @@
-# WarmWrite 2.2.1
+# WarmWrite 2.2.3
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -75,3 +75,13 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 - Fixes overlapping and clipped Reading Mode columns on iPhone.
 - Calculates each reading page from the usable width inside its margins.
 - Leaves the writing editor unchanged.
+
+## Version 2.2.2
+
+- Fixes blank pages after turning a page in Reading Mode.
+- Keeps the writing editor unchanged.
+
+## Version 2.2.3
+
+- Shows Reading Mode progress as a simple percentage rather than screen-page numbers.
+- Leaves pagination and the writing editor unchanged.
