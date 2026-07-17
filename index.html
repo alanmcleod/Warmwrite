@@ -22,6 +22,7 @@
     <div class="top-actions">
       <button id="helpBtn" class="icon-btn" aria-label="Instructions">?</button>
       <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙️</button>
+      <button id="readingBtn" class="icon-btn reading-entry-btn" aria-label="Open Reading Mode" title="Reading Mode">📖</button>
       <button id="focusBtn" class="focus-btn" aria-pressed="false">Focus is Off</button>
     </div>
   </header>
@@ -81,6 +82,21 @@
       <button id="hideKeyboardBtn" class="format-btn keyboard-btn">⌨</button>
     </nav>
   </main>
+
+  <section id="readingMode" class="reading-mode" hidden aria-label="Reading Mode">
+    <button id="readingExitBtn" class="reading-pen-btn" aria-label="Return to writing" title="Return to writing">✎</button>
+    <div id="readingControls" class="reading-controls" hidden>
+      <button id="readingSmallerBtn" class="reading-size-btn" aria-label="Smaller reading text">A−</button>
+      <span id="readingPageNumber" class="reading-page-number">1 of 1</span>
+      <button id="readingLargerBtn" class="reading-size-btn" aria-label="Larger reading text">A+</button>
+    </div>
+    <div id="readingViewport" class="reading-viewport">
+      <article id="readingPages" class="reading-pages"></article>
+    </div>
+    <button id="readingPrevZone" class="reading-tap-zone reading-prev-zone" aria-label="Previous page"></button>
+    <button id="readingCentreZone" class="reading-tap-zone reading-centre-zone" aria-label="Show reading controls"></button>
+    <button id="readingNextZone" class="reading-tap-zone reading-next-zone" aria-label="Next page"></button>
+  </section>
 </div>
 
 <dialog id="exportDialog" class="panel-dialog">
@@ -137,7 +153,7 @@
 
     <section class="updates-section">
       <h3>Updates</h3>
-      <div class="stat-row"><span>Current version</span><strong>2.1.0</strong></div>
+      <div class="stat-row"><span>Current version</span><strong>2.2.0</strong></div>
       <div class="stat-row"><span>Latest version</span><strong id="latestVersion">Not checked</strong></div>
       <label class="setting-row">
         <span><strong>Automatically check</strong><small>At most once per day.</small></span>

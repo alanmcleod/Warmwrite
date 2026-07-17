@@ -1,12 +1,13 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "notes": [
-    "Total words and words this session are displayed on separate lines",
-    "Focus Mode no longer dismisses an open mobile keyboard",
-    "Focus Mode uses a calmer reading layout when the keyboard is dismissed",
-    "Home shows up to ten recent documents and can reveal the full local list",
-    "Document entries show last-edited time and word count",
-    "WarmWrite warns about storage pressure and never automatically deletes documents",
-    "Retains Save / Share, printing fix and mobile keyboard dock fix"
+    "Adds a separate read-only Reading Mode opened with an open-book icon",
+    "Reading Mode hides the keyboard and all writing bars",
+    "Tap the left or right side for immediate page changes",
+    "Tap the centre to reveal page number and A\u2212 / A+ controls",
+    "The book control becomes a pen for returning to Write Mode",
+    "Reading text size is remembered and never changes the writing document",
+    "Returns to approximately the same passage without reopening the keyboard",
+    "Writing mode, Focus Mode, autosave and formatting are otherwise unchanged"
   ]
 }

@@ -118,3 +118,23 @@ body {
     --ww-visible-height: 100svh;
   }
 }
+
+
+/* Reading Mode is a separate, read-only layer. It does not alter editor styles. */
+.reading-entry-btn{font-size:1.08rem}
+.reading-mode{position:fixed;inset:0;z-index:100;background:var(--page);color:var(--ink);overflow:hidden;touch-action:manipulation}
+.reading-viewport{position:absolute;inset:0;overflow:hidden}
+.reading-pages{height:100%;box-sizing:border-box;padding:max(44px,calc(env(safe-area-inset-top) + 24px)) clamp(28px,8vw,80px) max(48px,calc(env(safe-area-inset-bottom) + 28px));font-family:var(--editor-font);font-size:var(--reading-font-size,1.18rem);line-height:1.78;column-fill:auto;column-gap:0;white-space:pre-wrap;overflow-wrap:anywhere;transition:none;will-change:transform}
+.reading-pages p,.reading-pages div{break-inside:avoid}
+.reading-pen-btn{position:fixed;z-index:104;top:max(10px,env(safe-area-inset-top));right:12px;width:42px;height:42px;border:1px solid rgba(72,60,42,.18);border-radius:50%;background:rgba(255,253,248,.92);color:var(--ink);font-size:1.55rem;line-height:1;box-shadow:0 3px 14px rgba(45,35,20,.12)}
+.reading-controls{position:fixed;z-index:104;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);height:40px;display:flex;align-items:center;gap:14px;padding:0 12px;border:1px solid rgba(72,60,42,.16);border-radius:20px;background:rgba(255,253,248,.94);box-shadow:0 3px 14px rgba(45,35,20,.1)}
+.reading-controls[hidden]{display:none}
+.reading-size-btn{border:0;background:transparent;color:var(--ink);font-weight:700;font-size:1rem;padding:8px}
+.reading-page-number{min-width:72px;text-align:center;color:var(--muted);font-size:.82rem;font-weight:700}
+.reading-tap-zone{position:fixed;z-index:102;top:0;bottom:0;border:0;background:transparent;padding:0;-webkit-tap-highlight-color:transparent}
+.reading-prev-zone{left:0;width:34%}
+.reading-centre-zone{left:34%;width:32%}
+.reading-next-zone{right:0;width:34%}
+body.reading-mode-open{overflow:hidden}
+body.reading-mode-open .topbar,body.reading-mode-open .workspace,body.reading-mode-open .drawer,body.reading-mode-open .scrim{visibility:hidden!important}
+@media(min-width:760px){.reading-pages{padding-inline:max(10vw,90px)}}

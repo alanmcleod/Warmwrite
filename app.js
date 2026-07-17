@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.1.0';
+const APP_VERSION='2.2.0';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -13,8 +13,8 @@ const $=id=>document.getElementById(id);
 const editor=$('editor'), editorWrap=$('editorWrap'), docTitle=$('docTitle'), saveStatus=$('saveStatus');
 let docs=loadJSON(DOCS_KEY,[]);
 let currentId=localStorage.getItem(CURRENT_KEY)||'';
-let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, savedRange=null, focusMode=false,showAllDocs=false,focusRestoreKeyboard=false;
-let settings={reminder:true,threshold:300,formatting:false,symbolsBar:true,symbols:DEFAULT_SYMBOLS,font:'classic',autoUpdate:true,...loadJSON(SETTINGS_KEY,{})};
+let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, savedRange=null, focusMode=false,showAllDocs=false,focusRestoreKeyboard=false,readingMode=false,readingPage=0,readingPageCount=1,readingControlsTimer=0,writingScrollTop=0;
+let settings={reminder:true,threshold:300,formatting:false,symbolsBar:true,symbols:DEFAULT_SYMBOLS,font:'classic',autoUpdate:true,readingSize:2,...loadJSON(SETTINGS_KEY,{})};
 
 function loadJSON(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}}
 function saveJSON(key,val){
@@ -139,6 +139,90 @@ function setFocus(on,restoreKeyboard=false){
     });
   }
 }
+
+const READING_SIZES=[1.02,1.10,1.18,1.28,1.40];
+function readingSizeValue(){
+  const i=Math.max(0,Math.min(READING_SIZES.length-1,Number(settings.readingSize)||2));
+  return READING_SIZES[i];
+}
+function updateReadingPage(){
+  const pages=$('readingPages'),viewport=$('readingViewport');
+  if(!pages||!viewport)return;
+  readingPage=Math.max(0,Math.min(readingPage,Math.max(0,readingPageCount-1)));
+  pages.style.transform=`translateX(${-readingPage*viewport.clientWidth}px)`;
+  $('readingPageNumber').textContent=`${readingPage+1} of ${readingPageCount}`;
+}
+function paginateReading(keepProgress=true){
+  if(!readingMode)return;
+  const pages=$('readingPages'),viewport=$('readingViewport');
+  const oldProgress=readingPageCount>1?readingPage/(readingPageCount-1):0;
+  const width=Math.max(1,viewport.clientWidth);
+  pages.style.columnWidth=`${width}px`;
+  pages.style.width=`${width}px`;
+  pages.style.transform='translateX(0)';
+  requestAnimationFrame(()=>{
+    readingPageCount=Math.max(1,Math.ceil(pages.scrollWidth/width));
+    if(keepProgress)readingPage=Math.round(oldProgress*Math.max(0,readingPageCount-1));
+    updateReadingPage();
+  });
+}
+function showReadingControls(){
+  const controls=$('readingControls');
+  controls.hidden=false;
+  clearTimeout(readingControlsTimer);
+  readingControlsTimer=setTimeout(()=>{if(readingMode)controls.hidden=true},2600);
+}
+function enterReadingMode(){
+  if(readingMode||document.body.classList.contains('home-open'))return;
+  persist();
+  rememberSelection();
+  writingScrollTop=editor.scrollTop;
+  editor.blur();
+  readingMode=true;
+  readingPage=0;
+  document.body.classList.add('reading-mode-open');
+  const mode=$('readingMode'),pages=$('readingPages');
+  pages.innerHTML=editor.innerHTML||'<p></p>';
+  pages.style.setProperty('--reading-font-size',`${readingSizeValue()}rem`);
+  mode.hidden=false;
+  requestAnimationFrame(()=>{
+    const max=Math.max(1,editor.scrollHeight-editor.clientHeight);
+    const progress=Math.max(0,Math.min(1,writingScrollTop/max));
+    const width=Math.max(1,$('readingViewport').clientWidth);
+    pages.style.columnWidth=`${width}px`;
+    pages.style.width=`${width}px`;
+    readingPageCount=Math.max(1,Math.ceil(pages.scrollWidth/width));
+    readingPage=Math.round(progress*Math.max(0,readingPageCount-1));
+    updateReadingPage();
+  });
+}
+function exitReadingMode(){
+  if(!readingMode)return;
+  const progress=readingPageCount>1?readingPage/(readingPageCount-1):0;
+  readingMode=false;
+  clearTimeout(readingControlsTimer);
+  $('readingControls').hidden=true;
+  $('readingMode').hidden=true;
+  document.body.classList.remove('reading-mode-open');
+  requestAnimationFrame(()=>{
+    const max=Math.max(0,editor.scrollHeight-editor.clientHeight);
+    editor.scrollTop=Math.round(progress*max);
+  });
+}
+function changeReadingSize(delta){
+  settings.readingSize=Math.max(0,Math.min(READING_SIZES.length-1,(Number(settings.readingSize)||2)+delta));
+  saveJSON(SETTINGS_KEY,settings);
+  $('readingPages').style.setProperty('--reading-font-size',`${readingSizeValue()}rem`);
+  paginateReading(true);
+  showReadingControls();
+}
+function turnReadingPage(delta){
+  const next=Math.max(0,Math.min(readingPage+delta,readingPageCount-1));
+  if(next===readingPage)return;
+  readingPage=next;
+  updateReadingPage();
+}
+
 function showHome(){
   persist();setFocus(false);document.body.classList.add('home-open');$('homeScreen').hidden=false;renderHome();closeDrawer();
 }
@@ -400,6 +484,14 @@ $('focusBtn').addEventListener('pointerdown',e=>{
   if(focusRestoreKeyboard)e.preventDefault();
 });
 $('focusBtn').onclick=()=>setFocus(!focusMode,focusRestoreKeyboard);
+$('readingBtn').onclick=enterReadingMode;
+$('readingExitBtn').onclick=exitReadingMode;
+$('readingPrevZone').onclick=()=>turnReadingPage(-1);
+$('readingNextZone').onclick=()=>turnReadingPage(1);
+$('readingCentreZone').onclick=showReadingControls;
+$('readingSmallerBtn').onclick=e=>{e.stopPropagation();changeReadingSize(-1)};
+$('readingLargerBtn').onclick=e=>{e.stopPropagation();changeReadingSize(1)};
+
 $('closeFileBtn').onclick=showHome;$('newFileBtn').onclick=()=>{createDoc();showEditor();closeDrawer();editor.focus()};
 $('openInput').onchange=e=>{importFile(e.target.files?.[0]);e.target.value=''};
 $('homeImportInput').onchange=e=>{importFile(e.target.files?.[0]);e.target.value=''};
@@ -471,10 +563,11 @@ if(window.visualViewport){
 window.addEventListener('resize',()=>{
   requestViewport();
   settleViewport();
+  if(readingMode)setTimeout(()=>paginateReading(true),100);
 });
 
 window.addEventListener('orientationchange',()=>{
-  setTimeout(()=>requestViewport(true),180);
+  setTimeout(()=>{requestViewport(true);if(readingMode)paginateReading(true)},180);
 });
 
 editor.addEventListener('focus',()=>{
@@ -488,6 +581,7 @@ editor.addEventListener('blur',()=>{
 
 requestViewport(true);
 loadCurrent();applySettings();renderRecents();renderHome();checkStorage();if(settings.autoUpdate)setTimeout(()=>checkUpdates(false),800);
+document.addEventListener('keydown',e=>{if(!readingMode)return;if(e.key==='ArrowLeft'){e.preventDefault();turnReadingPage(-1)}else if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();turnReadingPage(1)}else if(e.key==='Escape'){e.preventDefault();exitReadingMode()}});
 window.addEventListener('beforeunload',persist);
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 })();

@@ -1,4 +1,4 @@
-# WarmWrite 2.1.0
+# WarmWrite 2.2.0
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -60,3 +60,12 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 - Shows up to ten recent documents and adds **Show all documents**.
 - Shows last-edited times and word counts in the document list.
 - Warns about storage pressure and never automatically purges documents.
+
+## Version 2.2.0
+
+- Adds a separate, read-only **Reading Mode** using an open-book icon.
+- Hides the keyboard and all writing bars while reading.
+- Tap the left or right side of the screen to change pages instantly.
+- Tap the centre to reveal page count and **A− / A+** controls.
+- Use the pen icon to return to writing at approximately the same passage.
+- Reading size is remembered but does not alter the document or writing interface.
