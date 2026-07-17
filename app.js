@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.2.0';
+const APP_VERSION='2.2.1';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -152,16 +152,26 @@ function updateReadingPage(){
   pages.style.transform=`translateX(${-readingPage*viewport.clientWidth}px)`;
   $('readingPageNumber').textContent=`${readingPage+1} of ${readingPageCount}`;
 }
+function prepareReadingColumns(){
+  const pages=$('readingPages'),viewport=$('readingViewport');
+  const width=Math.max(1,viewport.clientWidth);
+  const styles=getComputedStyle(pages);
+  const left=parseFloat(styles.paddingLeft)||0;
+  const right=parseFloat(styles.paddingRight)||0;
+  const contentWidth=Math.max(1,width-left-right);
+  pages.style.width=`${width}px`;
+  pages.style.columnWidth=`${contentWidth}px`;
+  pages.style.columnGap=`${left+right}px`;
+  return width;
+}
 function paginateReading(keepProgress=true){
   if(!readingMode)return;
-  const pages=$('readingPages'),viewport=$('readingViewport');
+  const pages=$('readingPages');
   const oldProgress=readingPageCount>1?readingPage/(readingPageCount-1):0;
-  const width=Math.max(1,viewport.clientWidth);
-  pages.style.columnWidth=`${width}px`;
-  pages.style.width=`${width}px`;
+  const width=prepareReadingColumns();
   pages.style.transform='translateX(0)';
   requestAnimationFrame(()=>{
-    readingPageCount=Math.max(1,Math.ceil(pages.scrollWidth/width));
+    readingPageCount=Math.max(1,Math.round(pages.scrollWidth/width));
     if(keepProgress)readingPage=Math.round(oldProgress*Math.max(0,readingPageCount-1));
     updateReadingPage();
   });
@@ -188,10 +198,8 @@ function enterReadingMode(){
   requestAnimationFrame(()=>{
     const max=Math.max(1,editor.scrollHeight-editor.clientHeight);
     const progress=Math.max(0,Math.min(1,writingScrollTop/max));
-    const width=Math.max(1,$('readingViewport').clientWidth);
-    pages.style.columnWidth=`${width}px`;
-    pages.style.width=`${width}px`;
-    readingPageCount=Math.max(1,Math.ceil(pages.scrollWidth/width));
+    const width=prepareReadingColumns();
+    readingPageCount=Math.max(1,Math.round(pages.scrollWidth/width));
     readingPage=Math.round(progress*Math.max(0,readingPageCount-1));
     updateReadingPage();
   });

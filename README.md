@@ -1,4 +1,4 @@
-# WarmWrite 2.2.0
+# WarmWrite 2.2.1
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -69,3 +69,9 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 - Tap the centre to reveal page count and **A− / A+** controls.
 - Use the pen icon to return to writing at approximately the same passage.
 - Reading size is remembered but does not alter the document or writing interface.
+
+## Version 2.2.1
+
+- Fixes overlapping and clipped Reading Mode columns on iPhone.
+- Calculates each reading page from the usable width inside its margins.
+- Leaves the writing editor unchanged.

@@ -1,13 +1,9 @@
 {
-  "version": "2.2.0",
+  "version": "2.2.1",
   "notes": [
-    "Adds a separate read-only Reading Mode opened with an open-book icon",
-    "Reading Mode hides the keyboard and all writing bars",
-    "Tap the left or right side for immediate page changes",
-    "Tap the centre to reveal page number and A\u2212 / A+ controls",
-    "The book control becomes a pen for returning to Write Mode",
-    "Reading text size is remembered and never changes the writing document",
-    "Returns to approximately the same passage without reopening the keyboard",
-    "Writing mode, Focus Mode, autosave and formatting are otherwise unchanged"
+    "Fixes overlapping and clipped columns in iPhone Reading Mode",
+    "Each page now uses the visible screen width with correct inner margins",
+    "Writing mode and existing editor behaviour are unchanged",
+    "Retains instant page changes, pen return control and reading text-size controls"
   ]
 }
