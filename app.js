@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.2.3';
+const APP_VERSION='2.2.4';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -145,37 +145,42 @@ function readingSizeValue(){
   const i=Math.max(0,Math.min(READING_SIZES.length-1,Number(settings.readingSize)||2));
   return READING_SIZES[i];
 }
+function readingViewportHeight(){
+  const viewport=$('readingViewport');
+  return Math.max(1,Math.floor(viewport.getBoundingClientRect().height||viewport.clientHeight||window.innerHeight));
+}
 function updateReadingPage(){
-  const pages=$('readingPages'),viewport=$('readingViewport');
-  if(!pages||!viewport)return;
+  const pages=$('readingPages');
+  if(!pages)return;
   readingPage=Math.max(0,Math.min(readingPage,Math.max(0,readingPageCount-1)));
-  pages.style.transform=`translateX(${-readingPage*viewport.clientWidth}px)`;
-  const readingPercent=readingPageCount<=1?100:Math.round(((readingPage+1)/readingPageCount)*100);
+  const pageHeight=readingViewportHeight();
+  pages.style.transform=`translateY(${-readingPage*pageHeight}px)`;
+  const readingPercent=readingPageCount<=1?100:Math.round((readingPage/Math.max(1,readingPageCount-1))*100);
   $('readingPageNumber').textContent=`${readingPercent}%`;
 }
-function prepareReadingColumns(){
-  const pages=$('readingPages'),viewport=$('readingViewport');
-  const width=Math.max(1,viewport.clientWidth);
-  const styles=getComputedStyle(pages);
-  const left=parseFloat(styles.paddingLeft)||0;
-  const right=parseFloat(styles.paddingRight)||0;
-  const contentWidth=Math.max(1,width-left-right);
-  pages.style.width=`${width}px`;
-  pages.style.columnWidth=`${contentWidth}px`;
-  pages.style.columnGap=`${left+right}px`;
-  return width;
+function prepareReadingFlow(){
+  const pages=$('readingPages');
+  pages.style.transform='translateY(0)';
+  pages.style.width='100%';
+  pages.style.columnWidth='auto';
+  pages.style.columnGap='normal';
+  pages.style.height='auto';
+  return readingViewportHeight();
 }
-function paginateReading(keepProgress=true){
+function measureReadingPages(keepProgress=true){
   if(!readingMode)return;
   const pages=$('readingPages');
   const oldProgress=readingPageCount>1?readingPage/(readingPageCount-1):0;
-  const width=prepareReadingColumns();
-  pages.style.transform='translateX(0)';
+  const pageHeight=prepareReadingFlow();
   requestAnimationFrame(()=>{
-    readingPageCount=Math.max(1,Math.ceil((pages.scrollWidth-1)/width));
-    if(keepProgress)readingPage=Math.round(oldProgress*Math.max(0,readingPageCount-1));
+    const contentHeight=Math.max(pageHeight,pages.scrollHeight);
+    readingPageCount=Math.max(1,Math.ceil((contentHeight-1)/pageHeight));
+    readingPage=keepProgress?Math.round(oldProgress*Math.max(0,readingPageCount-1)):0;
     updateReadingPage();
   });
+}
+function paginateReading(keepProgress=true){
+  measureReadingPages(keepProgress);
 }
 function showReadingControls(){
   const controls=$('readingControls');
@@ -199,10 +204,15 @@ function enterReadingMode(){
   requestAnimationFrame(()=>{
     const max=Math.max(1,editor.scrollHeight-editor.clientHeight);
     const progress=Math.max(0,Math.min(1,writingScrollTop/max));
-    const width=prepareReadingColumns();
-    readingPageCount=Math.max(1,Math.ceil((pages.scrollWidth-1)/width));
-    readingPage=Math.round(progress*Math.max(0,readingPageCount-1));
-    updateReadingPage();
+    prepareReadingFlow();
+    requestAnimationFrame(()=>{
+      const pageHeight=readingViewportHeight();
+      const contentHeight=Math.max(pageHeight,pages.scrollHeight);
+      readingPageCount=Math.max(1,Math.ceil((contentHeight-1)/pageHeight));
+      readingPage=Math.round(progress*Math.max(0,readingPageCount-1));
+      updateReadingPage();
+      setTimeout(()=>paginateReading(true),180);
+    });
   });
 }
 function exitReadingMode(){

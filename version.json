@@ -1,10 +1,9 @@
 {
-  "version": "2.2.3",
+  "version": "2.2.4",
   "notes": [
-    "Reading Mode progress is shown as a percentage instead of screen-page numbers",
-    "Fixes blank pages when moving forward in Reading Mode",
-    "Allows off-screen reading columns to remain available for page navigation",
-    "Uses safer page-count rounding",
-    "Writing mode remains unchanged"
+    "Replaces column-based Reading Mode pagination with reliable screen-height paging",
+    "Fixes blank pages when moving forward or backward",
+    "Reading progress remains percentage based",
+    "Writing mode and document storage are unchanged"
   ]
 }

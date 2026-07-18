@@ -1,4 +1,4 @@
-# WarmWrite 2.2.3
+# WarmWrite 2.2.4
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -85,3 +85,10 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 
 - Shows Reading Mode progress as a simple percentage rather than screen-page numbers.
 - Leaves pagination and the writing editor unchanged.
+
+## Version 2.2.4
+
+- Replaces fragile CSS-column pagination with one-screen-at-a-time vertical paging.
+- Fixes blank pages in Reading Mode.
+- Keeps the percentage progress display.
+- Does not alter the writing editor.
