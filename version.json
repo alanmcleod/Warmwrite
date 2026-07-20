@@ -1,9 +1,9 @@
 {
-  "version": "2.2.4",
+  "version": "2.2.5",
   "notes": [
-    "Replaces column-based Reading Mode pagination with reliable screen-height paging",
-    "Fixes blank pages when moving forward or backward",
-    "Reading progress remains percentage based",
-    "Writing mode and document storage are unchanged"
+    "Remembers a separate reading position for each document",
+    "Restores the same approximate passage after reopening WarmWrite",
+    "Shares position between Reading Mode and Write Mode",
+    "Does not attempt to restore the cursor or alter the writing editor"
   ]
 }

@@ -1,4 +1,4 @@
-# WarmWrite 2.2.4
+# WarmWrite 2.2.5
 
 **A fast, distraction-free writing app designed primarily for phones.**
 
@@ -92,3 +92,11 @@ Open the live app in Chrome → ⋮ → **Add to Home screen** or **Install app*
 - Fixes blank pages in Reading Mode.
 - Keeps the percentage progress display.
 - Does not alter the writing editor.
+
+
+## Version 2.2.5
+
+- Remembers the approximate position in each document.
+- Restores that position after closing or reopening the app.
+- Reading Mode and Write Mode share the same saved progress.
+- Cursor placement and the writing interface are unchanged.

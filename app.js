@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.2.4';
+const APP_VERSION='2.2.5';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
@@ -13,7 +13,7 @@ const $=id=>document.getElementById(id);
 const editor=$('editor'), editorWrap=$('editorWrap'), docTitle=$('docTitle'), saveStatus=$('saveStatus');
 let docs=loadJSON(DOCS_KEY,[]);
 let currentId=localStorage.getItem(CURRENT_KEY)||'';
-let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, savedRange=null, focusMode=false,showAllDocs=false,focusRestoreKeyboard=false,readingMode=false,readingPage=0,readingPageCount=1,readingControlsTimer=0,writingScrollTop=0;
+let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, positionSaveTimer=0, savedRange=null, focusMode=false,showAllDocs=false,focusRestoreKeyboard=false,readingMode=false,readingPage=0,readingPageCount=1,readingControlsTimer=0,writingScrollTop=0;
 let settings={reminder:true,threshold:300,formatting:false,symbolsBar:true,symbols:DEFAULT_SYMBOLS,font:'classic',autoUpdate:true,readingSize:2,...loadJSON(SETTINGS_KEY,{})};
 
 function loadJSON(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}}
@@ -34,10 +34,37 @@ function textNow(){return editor.innerText.replace(/\u00a0/g,' ')}
 function titleNow(){return docTitle.value.trim()||'Untitled'}
 function formatDate(ts){const d=new Date(ts||Date.now()),today=new Date();const day=d.toDateString()===today.toDateString()?'Today':d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});return `${day}, ${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`}
 
+function clampProgress(value){
+  const n=Number(value);
+  return Number.isFinite(n)?Math.max(0,Math.min(1,n)):0;
+}
+function editorProgress(){
+  const max=Math.max(0,editor.scrollHeight-editor.clientHeight);
+  return max>0?clampProgress(editor.scrollTop/max):0;
+}
+function savePositionOnly(progress=editorProgress()){
+  if(!currentDoc)return;
+  currentDoc.scrollProgress=clampProgress(progress);
+  try{localStorage.setItem(DOCS_KEY,JSON.stringify(docs))}catch{}
+}
+function queuePositionSave(progress){
+  clearTimeout(positionSaveTimer);
+  positionSaveTimer=setTimeout(()=>savePositionOnly(progress),180);
+}
+function restoreWritingPosition(){
+  if(!currentDoc)return;
+  const progress=clampProgress(currentDoc.scrollProgress);
+  const apply=()=>{
+    const max=Math.max(0,editor.scrollHeight-editor.clientHeight);
+    editor.scrollTop=Math.round(progress*max);
+  };
+  requestAnimationFrame(()=>{apply();setTimeout(apply,80)});
+}
+
 function ensureDoc(){
   currentDoc=docs.find(d=>d.id===currentId)||docs[0];
   if(!currentDoc){
-    currentDoc={id:uid(),title:'Untitled',html:'',baselineWords:0,updatedAt:Date.now()};
+    currentDoc={id:uid(),title:'Untitled',html:'',baselineWords:0,scrollProgress:0,updatedAt:Date.now()};
     docs=[currentDoc];
   }
   currentId=currentDoc.id;
@@ -50,12 +77,14 @@ function loadCurrent(){
   baselineWords=Number.isFinite(currentDoc.baselineWords)?currentDoc.baselineWords:countWords(textNow());
   sessionStartWords=countWords(textNow());
   updateStats();
+  restoreWritingPosition();
 }
 function persist(){
   if(!currentDoc)return;
   currentDoc.title=titleNow();
   currentDoc.html=editor.innerHTML;
   currentDoc.baselineWords=baselineWords;
+  currentDoc.scrollProgress=readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress();
   currentDoc.updatedAt=Date.now();
   docs.sort((a,b)=>b.updatedAt-a.updatedAt);
   const saved=saveJSON(DOCS_KEY,docs);
@@ -69,7 +98,7 @@ function persist(){
 function queueSave(){saveStatus.textContent='Saving…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,300)}
 function createDoc(){
   persist();
-  const d={id:uid(),title:'Untitled',html:'',baselineWords:0,updatedAt:Date.now()};
+  const d={id:uid(),title:'Untitled',html:'',baselineWords:0,scrollProgress:0,updatedAt:Date.now()};
   docs.unshift(d);currentDoc=d;currentId=d.id;localStorage.setItem(CURRENT_KEY,currentId);
   docTitle.value='Untitled';editor.innerHTML='';baselineWords=0;sessionStartWords=0;persist();updateStats();
 }
@@ -193,6 +222,8 @@ function enterReadingMode(){
   persist();
   rememberSelection();
   writingScrollTop=editor.scrollTop;
+  const storedProgress=editorProgress();
+  savePositionOnly(storedProgress);
   editor.blur();
   readingMode=true;
   readingPage=0;
@@ -202,8 +233,7 @@ function enterReadingMode(){
   pages.style.setProperty('--reading-font-size',`${readingSizeValue()}rem`);
   mode.hidden=false;
   requestAnimationFrame(()=>{
-    const max=Math.max(1,editor.scrollHeight-editor.clientHeight);
-    const progress=Math.max(0,Math.min(1,writingScrollTop/max));
+    const progress=clampProgress(currentDoc?.scrollProgress);
     prepareReadingFlow();
     requestAnimationFrame(()=>{
       const pageHeight=readingViewportHeight();
@@ -218,6 +248,7 @@ function enterReadingMode(){
 function exitReadingMode(){
   if(!readingMode)return;
   const progress=readingPageCount>1?readingPage/(readingPageCount-1):0;
+  savePositionOnly(progress);
   readingMode=false;
   clearTimeout(readingControlsTimer);
   $('readingControls').hidden=true;
@@ -240,6 +271,7 @@ function turnReadingPage(delta){
   if(next===readingPage)return;
   readingPage=next;
   updateReadingPage();
+  queuePositionSave(readingPageCount>1?readingPage/(readingPageCount-1):0);
 }
 
 function showHome(){
@@ -489,6 +521,7 @@ async function checkUpdates(manual=false){
 }
 
 editor.addEventListener('input',()=>{updateStats();queueSave()});
+editor.addEventListener('scroll',()=>{if(!readingMode)queuePositionSave(editorProgress())},{passive:true});
 editor.addEventListener('keyup',rememberSelection);editor.addEventListener('mouseup',rememberSelection);editor.addEventListener('touchend',rememberSelection);
 editor.addEventListener('paste',e=>{e.preventDefault();rememberSelection();const h=e.clipboardData?.getData('text/html'),t=e.clipboardData?.getData('text/plain')||'';if(h)insertFragment(cleanPastedHtml(h));else{const f=document.createDocumentFragment();t.replace(/\r\n?/g,'\n').split('\n').forEach((line,i,a)=>{f.appendChild(document.createTextNode(line));if(i<a.length-1)f.appendChild(document.createElement('br'))});insertFragment(f)}});
 docTitle.addEventListener('input',queueSave);
@@ -601,6 +634,8 @@ editor.addEventListener('blur',()=>{
 requestViewport(true);
 loadCurrent();applySettings();renderRecents();renderHome();checkStorage();if(settings.autoUpdate)setTimeout(()=>checkUpdates(false),800);
 document.addEventListener('keydown',e=>{if(!readingMode)return;if(e.key==='ArrowLeft'){e.preventDefault();turnReadingPage(-1)}else if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();turnReadingPage(1)}else if(e.key==='Escape'){e.preventDefault();exitReadingMode()}});
-window.addEventListener('beforeunload',persist);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')savePositionOnly(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress())});
+window.addEventListener('pagehide',()=>savePositionOnly(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress()));
+window.addEventListener('beforeunload',()=>{savePositionOnly(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress());persist()});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 })();
