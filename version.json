@@ -1,10 +1,6 @@
 {
-  "version": "2.3.0",
+  "version": "2.3.1",
   "notes": [
-    "Adds Find and Replace to the top bar",
-    "Moves the QuickStart Guide into the main menu",
-    "Adds Next, Previous, Replace and confirmed Replace All",
-    "Double-space after a word inserts a full stop and space",
-    "Keeps existing writing, reading, focus and saving behaviour"
+    "Larger Find & Replace icon to match the other top-bar controls"
   ]
 }
