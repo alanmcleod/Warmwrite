@@ -1,10 +1,11 @@
 (() => {
 'use strict';
 
-const APP_VERSION='2.2.5';
+const APP_VERSION='2.3.0';
 const DOCS_KEY='warmwrite.documents.v2';
 const CURRENT_KEY='warmwrite.current.v2';
 const SETTINGS_KEY='warmwrite.settings.v2';
+const POSITIONS_KEY='warmwrite.positions.v1';
 const UPDATE_KEY='warmwrite.updateCheckedAt';
 const VERSION_URL='./version.json';
 const DEFAULT_SYMBOLS='. , “ ” ‘ ’ ? ! — … ( ) : ; # % & £ $ €';
@@ -13,7 +14,8 @@ const $=id=>document.getElementById(id);
 const editor=$('editor'), editorWrap=$('editorWrap'), docTitle=$('docTitle'), saveStatus=$('saveStatus');
 let docs=loadJSON(DOCS_KEY,[]);
 let currentId=localStorage.getItem(CURRENT_KEY)||'';
-let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, positionSaveTimer=0, savedRange=null, focusMode=false,showAllDocs=false,focusRestoreKeyboard=false,readingMode=false,readingPage=0,readingPageCount=1,readingControlsTimer=0,writingScrollTop=0;
+let currentDoc=null, baselineWords=0, sessionStartWords=0, saveTimer=0, positionSaveTimer=0, savedRange=null, focusMode=false,showAllDocs=false,focusRestoreKeyboard=false,readingMode=false,readingPage=0,readingPageCount=1,readingControlsTimer=0,writingScrollTop=0,findMatchesCache=[],findMatchIndex=-1;
+let positions=loadJSON(POSITIONS_KEY,{});
 let settings={reminder:true,threshold:300,formatting:false,symbolsBar:true,symbols:DEFAULT_SYMBOLS,font:'classic',autoUpdate:true,readingSize:2,...loadJSON(SETTINGS_KEY,{})};
 
 function loadJSON(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}}
@@ -39,32 +41,41 @@ function clampProgress(value){
   return Number.isFinite(n)?Math.max(0,Math.min(1,n)):0;
 }
 function editorProgress(){
-  const max=Math.max(0,editor.scrollHeight-editor.clientHeight);
-  return max>0?clampProgress(editor.scrollTop/max):0;
+  try{
+    const max=Math.max(0,editor.scrollHeight-editor.clientHeight);
+    return max>0?clampProgress(editor.scrollTop/max):0;
+  }catch{return 0}
 }
-function savePositionOnly(progress=editorProgress()){
-  if(!currentDoc)return;
-  currentDoc.scrollProgress=clampProgress(progress);
-  try{localStorage.setItem(DOCS_KEY,JSON.stringify(docs))}catch{}
+function savedProgress(){
+  if(!currentId)return 0;
+  return clampProgress(positions&&positions[currentId]);
+}
+function savePosition(progress){
+  if(!currentId)return;
+  try{
+    positions[currentId]=clampProgress(progress);
+    localStorage.setItem(POSITIONS_KEY,JSON.stringify(positions));
+  }catch{}
 }
 function queuePositionSave(progress){
   clearTimeout(positionSaveTimer);
-  positionSaveTimer=setTimeout(()=>savePositionOnly(progress),180);
+  positionSaveTimer=setTimeout(()=>savePosition(progress),250);
 }
-function restoreWritingPosition(){
-  if(!currentDoc)return;
-  const progress=clampProgress(currentDoc.scrollProgress);
+function restoreWritingPosition(progress=savedProgress()){
+  const p=clampProgress(progress);
   const apply=()=>{
-    const max=Math.max(0,editor.scrollHeight-editor.clientHeight);
-    editor.scrollTop=Math.round(progress*max);
+    try{
+      const max=Math.max(0,editor.scrollHeight-editor.clientHeight);
+      editor.scrollTop=Math.round(p*max);
+    }catch{}
   };
-  requestAnimationFrame(()=>{apply();setTimeout(apply,80)});
+  requestAnimationFrame(()=>{apply();setTimeout(apply,120);setTimeout(apply,350)});
 }
 
 function ensureDoc(){
   currentDoc=docs.find(d=>d.id===currentId)||docs[0];
   if(!currentDoc){
-    currentDoc={id:uid(),title:'Untitled',html:'',baselineWords:0,scrollProgress:0,updatedAt:Date.now()};
+    currentDoc={id:uid(),title:'Untitled',html:'',baselineWords:0,updatedAt:Date.now()};
     docs=[currentDoc];
   }
   currentId=currentDoc.id;
@@ -84,7 +95,6 @@ function persist(){
   currentDoc.title=titleNow();
   currentDoc.html=editor.innerHTML;
   currentDoc.baselineWords=baselineWords;
-  currentDoc.scrollProgress=readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress();
   currentDoc.updatedAt=Date.now();
   docs.sort((a,b)=>b.updatedAt-a.updatedAt);
   const saved=saveJSON(DOCS_KEY,docs);
@@ -98,7 +108,7 @@ function persist(){
 function queueSave(){saveStatus.textContent='Saving…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,300)}
 function createDoc(){
   persist();
-  const d={id:uid(),title:'Untitled',html:'',baselineWords:0,scrollProgress:0,updatedAt:Date.now()};
+  const d={id:uid(),title:'Untitled',html:'',baselineWords:0,updatedAt:Date.now()};
   docs.unshift(d);currentDoc=d;currentId=d.id;localStorage.setItem(CURRENT_KEY,currentId);
   docTitle.value='Untitled';editor.innerHTML='';baselineWords=0;sessionStartWords=0;persist();updateStats();
 }
@@ -222,8 +232,8 @@ function enterReadingMode(){
   persist();
   rememberSelection();
   writingScrollTop=editor.scrollTop;
-  const storedProgress=editorProgress();
-  savePositionOnly(storedProgress);
+  const writeProgress=editorProgress();
+  savePosition(writeProgress);
   editor.blur();
   readingMode=true;
   readingPage=0;
@@ -233,7 +243,7 @@ function enterReadingMode(){
   pages.style.setProperty('--reading-font-size',`${readingSizeValue()}rem`);
   mode.hidden=false;
   requestAnimationFrame(()=>{
-    const progress=clampProgress(currentDoc?.scrollProgress);
+    const progress=savedProgress();
     prepareReadingFlow();
     requestAnimationFrame(()=>{
       const pageHeight=readingViewportHeight();
@@ -248,7 +258,7 @@ function enterReadingMode(){
 function exitReadingMode(){
   if(!readingMode)return;
   const progress=readingPageCount>1?readingPage/(readingPageCount-1):0;
-  savePositionOnly(progress);
+  savePosition(progress);
   readingMode=false;
   clearTimeout(readingControlsTimer);
   $('readingControls').hidden=true;
@@ -366,6 +376,91 @@ function insertText(txt){
 }
 function applyCommand(cmd){
   editor.focus();restoreSelection();document.execCommand(cmd,false);rememberSelection();updateStats();queueSave();
+}
+
+function findTextNodes(){
+  const walker=document.createTreeWalker(editor,NodeFilter.SHOW_TEXT);
+  const nodes=[];let node,total=0;
+  while((node=walker.nextNode())){
+    const start=total,end=start+(node.nodeValue||'').length;
+    nodes.push({node,start,end});total=end;
+  }
+  return {nodes,text:nodes.map(x=>x.node.nodeValue||'').join('')};
+}
+function makeRangeFromOffsets(start,end){
+  const map=findTextNodes(),r=document.createRange();
+  if(!map.nodes.length)return null;
+  const a=map.nodes.find(x=>start>=x.start&&start<=x.end)||map.nodes[map.nodes.length-1];
+  const b=map.nodes.find(x=>end>=x.start&&end<=x.end)||map.nodes[map.nodes.length-1];
+  r.setStart(a.node,Math.max(0,Math.min((a.node.nodeValue||'').length,start-a.start)));
+  r.setEnd(b.node,Math.max(0,Math.min((b.node.nodeValue||'').length,end-b.start)));
+  return r;
+}
+function buildFindMatches(){
+  const term=$('findInput').value;
+  findMatchesCache=[];findMatchIndex=-1;
+  if(!term){$('findStatus').textContent='0';return}
+  const hay=findTextNodes().text.toLocaleLowerCase(),needle=term.toLocaleLowerCase();
+  let at=0;
+  while((at=hay.indexOf(needle,at))!==-1){findMatchesCache.push({start:at,end:at+term.length});at+=Math.max(1,term.length)}
+  $('findStatus').textContent=String(findMatchesCache.length);
+}
+function revealFindMatch(index){
+  if(!findMatchesCache.length)return;
+  findMatchIndex=(index+findMatchesCache.length)%findMatchesCache.length;
+  const m=findMatchesCache[findMatchIndex],r=makeRangeFromOffsets(m.start,m.end);
+  if(!r)return;
+  const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+  const el=r.startContainer.parentElement;
+  if(el)el.scrollIntoView({block:'center',behavior:'smooth'});
+  $('findStatus').textContent=`${findMatchIndex+1} of ${findMatchesCache.length}`;
+}
+function findStep(delta){
+  const term=$('findInput').value;
+  if(!term)return;
+  if(!findMatchesCache.length)buildFindMatches();
+  if(!findMatchesCache.length)return;
+  revealFindMatch(findMatchIndex<0?(delta>0?0:findMatchesCache.length-1):findMatchIndex+delta);
+}
+function replaceCurrentMatch(){
+  if(!findMatchesCache.length||findMatchIndex<0){findStep(1);return}
+  const m=findMatchesCache[findMatchIndex],r=makeRangeFromOffsets(m.start,m.end);
+  if(!r)return;
+  r.deleteContents();r.insertNode(document.createTextNode($('replaceInput').value));
+  updateStats();queueSave();buildFindMatches();
+  if(findMatchesCache.length)revealFindMatch(Math.min(findMatchIndex,findMatchesCache.length-1));
+}
+function replaceAllMatches(){
+  buildFindMatches();
+  if(!findMatchesCache.length)return;
+  const count=findMatchesCache.length;
+  if(!confirm(`Replace all ${count} match${count===1?'':'es'}?`))return;
+  const replacement=$('replaceInput').value;
+  [...findMatchesCache].reverse().forEach(m=>{
+    const r=makeRangeFromOffsets(m.start,m.end);
+    if(r){r.deleteContents();r.insertNode(document.createTextNode(replacement))}
+  });
+  updateStats();queueSave();buildFindMatches();
+  $('findStatus').textContent=`Replaced ${count}`;
+}
+function openFindDialog(){
+  rememberSelection();buildFindMatches();$('findDialog').showModal();setTimeout(()=>$('findInput').focus(),50);
+}
+function maybeDoubleSpaceFullStop(e){
+  if(e.inputType!=='insertText'||e.data!==' ')return;
+  const s=window.getSelection();
+  if(!s||!s.rangeCount||!s.isCollapsed||!editor.contains(s.anchorNode))return;
+  const node=s.anchorNode,offset=s.anchorOffset;
+  if(node.nodeType!==Node.TEXT_NODE||offset<2)return;
+  const text=node.nodeValue||'';
+  if(text[offset-1]!==' ')return;
+  const before=text[offset-2]||'';
+  if(!/[\p{L}\p{N}\)\]]/u.test(before))return;
+  e.preventDefault();
+  const r=document.createRange();r.setStart(node,offset-1);r.setEnd(node,offset);r.deleteContents();
+  const n=document.createTextNode('. ');r.insertNode(n);r.setStartAfter(n);r.collapse(true);
+  s.removeAllRanges();s.addRange(r);savedRange=r.cloneRange();
+  updateStats();queueSave();
 }
 
 function cleanPastedHtml(html){
@@ -520,6 +615,7 @@ async function checkUpdates(manual=false){
   catch{$('latestVersion').textContent='Unable to check';if(manual)alert('WarmWrite could not check for updates.')}
 }
 
+editor.addEventListener('beforeinput',maybeDoubleSpaceFullStop);
 editor.addEventListener('input',()=>{updateStats();queueSave()});
 editor.addEventListener('scroll',()=>{if(!readingMode)queuePositionSave(editorProgress())},{passive:true});
 editor.addEventListener('keyup',rememberSelection);editor.addEventListener('mouseup',rememberSelection);editor.addEventListener('touchend',rememberSelection);
@@ -529,7 +625,13 @@ document.querySelectorAll('[data-cmd]').forEach(b=>{b.addEventListener('pointerd
 
 $('menuBtn').onclick=openDrawer;$('closeDrawerBtn').onclick=closeDrawer;$('scrim').onclick=closeDrawer;
 $('settingsBtn').onclick=()=>$('settingsDialog').showModal();
-$('helpBtn').onclick=()=>$('helpDialog').showModal();
+$('findBtn').onclick=openFindDialog;
+$('quickGuideBtn').onclick=()=>{closeDrawer();$('helpDialog').showModal()};
+$('findInput').addEventListener('input',buildFindMatches);
+$('findPrevBtn').onclick=()=>findStep(-1);
+$('findNextBtn').onclick=()=>findStep(1);
+$('replaceBtn').onclick=replaceCurrentMatch;
+$('replaceAllBtn').onclick=replaceAllMatches;
 $('focusBtn').addEventListener('pointerdown',e=>{
   focusRestoreKeyboard=keyboardIsOpen()||document.activeElement===editor;
   rememberSelection();
@@ -634,8 +736,8 @@ editor.addEventListener('blur',()=>{
 requestViewport(true);
 loadCurrent();applySettings();renderRecents();renderHome();checkStorage();if(settings.autoUpdate)setTimeout(()=>checkUpdates(false),800);
 document.addEventListener('keydown',e=>{if(!readingMode)return;if(e.key==='ArrowLeft'){e.preventDefault();turnReadingPage(-1)}else if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();turnReadingPage(1)}else if(e.key==='Escape'){e.preventDefault();exitReadingMode()}});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')savePositionOnly(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress())});
-window.addEventListener('pagehide',()=>savePositionOnly(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress()));
-window.addEventListener('beforeunload',()=>{savePositionOnly(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress());persist()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')savePosition(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress())});
+window.addEventListener('pagehide',()=>savePosition(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress()));
+window.addEventListener('beforeunload',()=>{savePosition(readingMode?(readingPageCount>1?readingPage/(readingPageCount-1):0):editorProgress());persist()});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
 })();

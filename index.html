@@ -20,7 +20,7 @@
       <div id="saveStatus" class="subtle">✓ Saved</div>
     </div>
     <div class="top-actions">
-      <button id="helpBtn" class="icon-btn" aria-label="Instructions">?</button>
+      <button id="findBtn" class="icon-btn" aria-label="Find and replace" title="Find and Replace">⌕</button>
       <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙️</button>
       <button id="readingBtn" class="icon-btn reading-entry-btn" aria-label="Open Reading Mode" title="Reading Mode">📖</button>
       <button id="focusBtn" class="focus-btn" aria-pressed="false">Focus is Off</button>
@@ -32,6 +32,7 @@
     <button id="closeFileBtn" class="menu-row">Close file</button>
     <button id="newFileBtn" class="menu-row">New document</button>
     <label class="menu-row file-row">Open document…<input id="openInput" type="file" accept=".txt,.rtf,text/plain,text/rtf,application/rtf" hidden></label>
+    <button id="quickGuideBtn" class="menu-row">QuickStart Guide</button>
     <div class="recent-heading">Recent</div>
     <div id="drawerRecent"></div>
   </aside>
@@ -99,6 +100,25 @@
   </section>
 </div>
 
+<dialog id="findDialog" class="panel-dialog">
+  <form method="dialog">
+    <div class="dialog-head"><strong>Find &amp; Replace</strong><button value="cancel" class="icon-btn">×</button></div>
+    <label class="setting-block">
+      <span><strong>Find</strong></span>
+      <input id="findInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Word or phrase">
+    </label>
+    <label class="setting-block">
+      <span><strong>Replace with</strong></span>
+      <input id="replaceInput" type="text" autocomplete="off" spellcheck="false" placeholder="Replacement text">
+    </label>
+    <div class="stat-row"><span>Matches</span><strong id="findStatus">0</strong></div>
+    <button id="findPrevBtn" type="button" class="primary-row">Previous</button>
+    <button id="findNextBtn" type="button" class="primary-row">Next</button>
+    <button id="replaceBtn" type="button" class="primary-row">Replace</button>
+    <button id="replaceAllBtn" type="button" class="primary-row">Replace all</button>
+  </form>
+</dialog>
+
 <dialog id="exportDialog" class="panel-dialog">
   <form method="dialog">
     <div class="dialog-head"><strong>Save / Share</strong><button value="cancel" class="icon-btn">×</button></div>
@@ -153,7 +173,7 @@
 
     <section class="updates-section">
       <h3>Updates</h3>
-      <div class="stat-row"><span>Current version</span><strong>2.2.1</strong></div>
+      <div class="stat-row"><span>Current version</span><strong>2.3.0</strong></div>
       <div class="stat-row"><span>Latest version</span><strong id="latestVersion">Not checked</strong></div>
       <label class="setting-row">
         <span><strong>Automatically check</strong><small>At most once per day.</small></span>

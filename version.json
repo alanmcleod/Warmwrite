@@ -1,9 +1,10 @@
 {
-  "version": "2.2.5",
+  "version": "2.3.0",
   "notes": [
-    "Remembers a separate reading position for each document",
-    "Restores the same approximate passage after reopening WarmWrite",
-    "Shares position between Reading Mode and Write Mode",
-    "Does not attempt to restore the cursor or alter the writing editor"
+    "Adds Find and Replace to the top bar",
+    "Moves the QuickStart Guide into the main menu",
+    "Adds Next, Previous, Replace and confirmed Replace All",
+    "Double-space after a word inserts a full stop and space",
+    "Keeps existing writing, reading, focus and saving behaviour"
   ]
 }
